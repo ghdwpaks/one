@@ -1,0 +1,158 @@
+{
+  "shortcuts": [
+    {
+      "key": "1",
+      "action": "search",
+      "params": { "target": 1 },
+      "description": "네이버 일본어 사전에서 부수 검색"
+    },
+    {
+      "key": "2",
+      "action": "search",
+      "params": { "target": 2 },
+      "description": "네이버 일본어 사전에서 음독 검색"
+    },
+    {
+      "key": "3",
+      "action": "search",
+      "params": { "target": 3 },
+      "description": "네이버 일본어 사전에서 훈독 검색 (ctrl 조합은 자동처리)"
+    },
+    {
+      "key": "4",
+      "action": "search",
+      "params": { "target": 4 },
+      "description": "네이버 일본어 사전에서 한국어 뜻 검색"
+    },
+    {
+      "key": "q",
+      "action": "search",
+      "params": { "target": 11 },
+      "description": "GPT 한테 할 질문 복사"
+    },
+    {
+      "key": "e",
+      "action": "search",
+      "params": { "target": 12 },
+      "description": "현재 보고있는 한자 복사"
+    },
+    {
+      "key": ";",
+      "action": "search",
+      "params": { "target": 13 },
+      "description": "시험 종료 및 결과 출력"
+    },
+    {
+      "key": "w",
+      "action": "toggle_screen",
+      "description": "뜻/단어 화면 전환"
+    },
+    {
+      "key": "a",
+      "action": "unknown_action",
+      "description": "'모르겠어요' (왼쪽 방향키도 동일 기능)"
+    },
+    {
+      "key": "d",
+      "action": "known_action",
+      "description": "'알겠어요' (오른쪽 방향키도 동일 기능)"
+    },
+    {
+      "key": "Left",
+      "action": "unknown_action",
+      "description": "왼쪽 방향키: 모르겠어요"
+    },
+    {
+      "key": "Right",
+      "action": "known_action",
+      "description": "오른쪽 방향키: 알겠어요"
+    },
+    {
+      "key": "Up",
+      "action": "toggle_screen",
+      "description": "화면 전환 (위쪽 방향키)"
+    },
+
+    {
+      "key": "z",
+      "action": "search",
+      "params": { "target": 1, "word": "z" },
+      "description": "복수한자: 1번째 한자 검색"
+    },
+    {
+      "key": "Shift+z",
+      "action": "search",
+      "params": { "target": 2, "word": "z" },
+      "description": "복수한자: 1번째 한자 복사"
+    },
+    {
+      "key": "Ctrl+z",
+      "action": "search",
+      "params": { "target": 3, "word": "z" },
+      "description": "복수한자: 1번째 한자 GPT 질문 복사"
+    },
+    {
+      "key": "Alt+z",
+      "action": "search",
+      "params": { "target": 4, "word": "z" },
+      "description": "복수한자: 1번째 한자 구성 분석(jitenon, VSCode)"
+    },
+
+    {
+      "key": "x",
+      "action": "search",
+      "params": { "target": 1, "word": "x" },
+      "description": "복수한자: 2번째 한자 검색"
+    },
+    {
+      "key": "Shift+x",
+      "action": "search",
+      "params": { "target": 2, "word": "x" },
+      "description": "복수한자: 2번째 한자 복사"
+    },
+    {
+      "key": "Ctrl+x",
+      "action": "search",
+      "params": { "target": 3, "word": "x" },
+      "description": "복수한자: 2번째 한자 GPT 질문 복사"
+    },
+    {
+      "key": "Alt+x",
+      "action": "search",
+      "params": { "target": 4, "word": "x" },
+      "description": "복수한자: 2번째 한자 구성 분석(jitenon, VSCode)"
+    },
+
+    {
+      "key": "c",
+      "action": "search",
+      "params": { "target": 1, "word": "c" },
+      "description": "복수한자: 3번째 한자 검색"
+    },
+    {
+      "key": "Shift+c",
+      "action": "search",
+      "params": { "target": 2, "word": "c" },
+      "description": "복수한자: 3번째 한자 복사"
+    },
+    {
+      "key": "Ctrl+c",
+      "action": "search",
+      "params": { "target": 3, "word": "c" },
+      "description": "복수한자: 3번째 한자 GPT 질문 복사"
+    },
+    {
+      "key": "Alt+c",
+      "action": "search",
+      "params": { "target": 4, "word": "c" },
+      "description": "복수한자: 3번째 한자 구성 분석(jitenon, VSCode)"
+    },
+
+    {
+      "key": "Ctrl+3",
+      "action": "search",
+      "params": { "target": 5, "word": 3 },
+      "description": "훈독 여러줄 VSCode로 열기"
+    }
+  ]
+}
