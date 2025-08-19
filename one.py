@@ -1,4 +1,4 @@
-csv_file_path = "z_out175734_21_41.csv"
+csv_file_path = "z_out175734_121_140.csv"
 
 #Caps Lock 주의!!!
 
@@ -44,8 +44,22 @@ import tempfile
 import os
 import subprocess
 import json
-
+import random
 import tool
+
+font_size = 15#32,64
+font_info = {
+    "title_label":20,
+    "info_label":14,
+    "num_parts_label":14,
+    "current_part_label":14,
+    "p_label":font_size,
+    "s_label":font_size,
+    "m_label":font_size,
+    "km_label":font_size,
+    "end_label":font_size,
+    "kanji_font_size":30,#360,240
+}
 
 font_size = 64#32,64
 font_info = {
@@ -58,9 +72,8 @@ font_info = {
     "m_label":font_size,
     "km_label":font_size,
     "end_label":font_size,
-    "kanji_font_size":360,#360,240
+    "kanji_font_size":420,#360,240,420
 }
-
 
 # CSV 파일 읽기
 def read_and_process_csv(file_path):
@@ -90,16 +103,16 @@ def read_and_process_csv(file_path):
 
 
 
+
 # 단일한자데이터시트 예시
 single_kanji_data = [{'k': '定', 'km': '(결)정', 'p': '宀 (3획)', 's': 'じょう·てい', 'm': 'さだまる·さだめる·さだか', 'knows': 0}]
 
 
-test_data = read_and_process_csv(csv_file_path)
+#file_path = tool.open_csv(called_from_one=True)
 test_data = single_kanji_data
+test_data = read_and_process_csv(csv_file_path)
 
 
-file_path = tool.open_csv(called_from_one=True)
-test_data = read_and_process_csv(file_path)
 
 # CustomTkinter 테마 설정
 ctk.set_appearance_mode("dark")  # 다크 모드
@@ -124,6 +137,7 @@ class FlashcardApp(ctk.CTk):
         self.current_index = 0  # 현재 단어 인덱스
         self.visited = [False] * len(test_data)  # 방문 여부를 추적하는 리스트
         self.remaining_data = test_data  # 방문 여부를 추적하는 리스트
+        self.viewed_index_list = []
 
         # '뜻 화면' 구성
         self.meaning_frame = ctk.CTkFrame(self)
@@ -294,6 +308,7 @@ class FlashcardApp(ctk.CTk):
             if li.find("span", class_="separator2"):
                 text = li.get_text(strip=True)
                 result.append(f"{text} = ")
+        result.append(f" = ")
         return result
 
     def open_kanji_detail_by_unicoded_word(self, unicoded_word: str):
@@ -333,7 +348,8 @@ class FlashcardApp(ctk.CTk):
 
     def update_progress_bar(self):
         """진행 바 업데이트"""
-        progress = (self.current_index + 1) / len(self.remaining_data)  # 진행률 계산
+        #progress = (self.current_index + 1) / len(self.remaining_data)  # 진행률 계산
+        progress = (len(self.viewed_index_list)) / len(self.remaining_data)  # 진행률 계산
         self.progress_bar.set(progress)  # 진행률 업데이트
 
     def show_initial_screen(self):
@@ -391,6 +407,7 @@ class FlashcardApp(ctk.CTk):
         self.remaining_data = self.remaining_data[start_idx:end_idx]
         
         self.visited = [False] * len(self.remaining_data)  # 방문 여부를 추적하는 리스트
+        self.viewed_index_list = []
 
         # 설정 완료 후 기존 시험 로직으로 넘어가기
 
@@ -498,6 +515,7 @@ class FlashcardApp(ctk.CTk):
     def next_card(self,selected_end=False):
         # 현재 카드를 방문 처리
         self.visited[self.current_index] = True
+        self.viewed_index_list.append(self.current_index)
         # 방문 여부 확인
         if all(self.visited) or selected_end:  # 모든 카드가 방문되었으면 종료
             self.progress_bar.set(1)  # 진행률 100%
@@ -521,7 +539,10 @@ class FlashcardApp(ctk.CTk):
 
         self.update_progress_bar()  # 진행 바 업데이트
         # 다음 카드로 이동
-        self.current_index = (self.current_index + 1) % len(self.remaining_data)
+        #self.current_index = [i for i in range(len(self.visited)) if i not in self.viewed_index_list]
+        self.current_index = random.choice([i for i in range(len(self.visited)) if i not in self.viewed_index_list])
+
+        #self.current_index = (self.current_index + 1) % len(self.remaining_data)
         if self.is_meaning_screen:
             self.update_meaning_screen()
         else:
@@ -632,6 +653,7 @@ class FlashcardApp(ctk.CTk):
         self.current_index = 0
         
         self.visited = [False] * len(self.remaining_data)
+        self.viewed_index_list = [] 
 
         self.update_meaning_screen()
 
