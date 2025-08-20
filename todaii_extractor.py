@@ -1,9 +1,18 @@
 from __future__ import annotations
 from __future__ import print_function
-URL_JSON_DEFAULT_PATH = 'todaii_urls.json'
-SENTENCE_JSON_DEFAULT_PATH = 'todaii_sentences.json'
-GRAMMER_JSON_DEFAULT_PATH = 'todaii_grammers.json'
-PUBLIC_TIMEOUT = 5#sec
+from pathlib import Path
+
+BASE_DIR = Path(r"C:\\todaii")  # 또는 Path.home() / "AppData/Local/todaii"
+BASE_DIR.mkdir(parents=True, exist_ok=True)  # 폴더 없으면 생성
+
+URL_JSON_DEFAULT_PATH = str(BASE_DIR / "todaii_urls.json")
+SENTENCE_JSON_DEFAULT_PATH = str(BASE_DIR / "todaii_sentences.json")
+GRAMMER_JSON_DEFAULT_PATH = str(BASE_DIR / "todaii_grammers.json")
+
+print("URL_JSON_DEFAULT_PATH :",URL_JSON_DEFAULT_PATH)
+print("SENTENCE_JSON_DEFAULT_PATH :",SENTENCE_JSON_DEFAULT_PATH)
+print("GRAMMER_JSON_DEFAULT_PATH :",GRAMMER_JSON_DEFAULT_PATH)
+
 
 import json
 from contextlib import nullcontext
@@ -24,7 +33,11 @@ from bs4 import BeautifulSoup, Tag
 import time
 import psutil
 import json
-import os
+import tempfile
+from typing import Any
+import contextlib
+import os, json, tempfile, time, random, stat
+from typing import Any
 # path: scripts/extract_urls.py
 """
 Goal: Fetch a web page and print ALL discoverable URL links found in the HTML.
@@ -68,38 +81,204 @@ DEFAULT_URL = (
 )
 
 
+
+
+
+def _robust_replace(src: str, dst: str, *, attempts: int = 60) -> None:
+    """Windows의 일시적 핸들 점유(백신/인덱서/동시 읽기)를 재시도로 우회."""
+    last_exc = None
+    # 대상이 읽기전용이면 교체가 막히므로 먼저 권한 회복 시도
+    if os.name == "nt" and os.path.exists(dst):
+        try:
+            os.chmod(dst, stat.S_IWRITE | stat.S_IREAD)
+        except Exception:
+            pass
+
+    for i in range(attempts):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError as e:
+            last_exc = e
+            # 짧은 지수백오프 + 지터(수 ms): AV/인덱서/다른 핸들 해제 대기
+            time.sleep(min(0.5, 0.005 * (2 ** min(i, 8))) + random.random() * 0.01)
+        except OSError as e:
+            # 드물게 발생하는 공유위반 등도 동일 처리
+            last_exc = e
+            time.sleep(0.01 + random.random() * 0.02)
+    # 그래도 실패하면 원인 확인을 위해 예외 재발행
+    raise last_exc
+
+
+def atomic_json_write(path: str, obj: Any) -> None:
+    """
+    임시파일에 완전 기록+fsync 후, 대상 절대경로로 원자적 교체.
+    Windows의 일시적 잠금을 재시도로 우회.
+    """
+    # 절대경로 고정(스레드별 CWD 변동/상대경로 혼동 방지)
+    dst_abs = os.path.abspath(path)
+    dir_path = os.path.dirname(dst_abs) or "."
+
+    # 직렬화 선행(쓰기 도중 예외 최소화)
+    data_bytes = json.dumps(obj, ensure_ascii=False, indent=4).encode("utf-8")
+
+    fd, tmp_path = tempfile.mkstemp(prefix=".tmp-", suffix=".json", dir=dir_path)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data_bytes)
+            f.flush()
+            os.fsync(f.fileno())  # 본문 내구성
+
+        # Windows에서 간헐적 PermissionError를 재시도로 해소
+        _robust_replace(tmp_path, dst_abs)
+
+        # 가능하면 디렉터리 메타데이터 flush
+        try:
+            dfd = os.open(dir_path, os.O_RDONLY)
+            try:
+                os.fsync(dfd)
+            finally:
+                os.close(dfd)
+        except Exception:
+            pass
+    finally:
+        # 실패 시 tmp 정리(성공 시 이미 move됨)
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except Exception:
+            pass
+
+
+
+
+data = None
+with open(URL_JSON_DEFAULT_PATH, 'r', encoding='utf-8') as f:
+    data = json.load(f)
+
+data["viewed_url_list"] = list(set(data["viewed_url_list"]))
+data["schedule_url_list"] = list(set(d(data["schedule_url_list"] + data["stage_url_list"])))
+
+data["stage_url_list"] = []
+
+data["schedule_url_list"] = list(set(data["schedule_url_list"]))
+
+for i in data["viewed_url_list"] :
+    if i in data["schedule_url_list"] :
+        #schedule_url_list 에서 'viewed_url_list 의 url' 제거
+        data["schedule_url_list"] = [x for x in data["schedule_url_list"] if x != i]
+        print("1",end="")
+print()
+
+atomic_json_write(URL_JSON_DEFAULT_PATH, data)
+#with open(URL_JSON_DEFAULT_PATH, 'w', encoding='utf-8') as f:json.dump(data, f, ensure_ascii=False, indent=4)
+
+
+data = None
+with open(SENTENCE_JSON_DEFAULT_PATH, 'r', encoding='utf-8') as f : data = json.load(f)
+data["data"] = list(set(data["data"]))
+atomic_json_write(SENTENCE_JSON_DEFAULT_PATH, data)
+#with open(SENTENCE_JSON_DEFAULT_PATH, 'w', encoding='utf-8') as f : json.dump(data, f, ensure_ascii=False, indent=4)
+
+data = None
+with open(GRAMMER_JSON_DEFAULT_PATH, 'r', encoding='utf-8') as f : data = json.load(f)
+data["data"] = list(set(data["data"]))
+atomic_json_write(GRAMMER_JSON_DEFAULT_PATH, data)
+#with open(GRAMMER_JSON_DEFAULT_PATH, 'w', encoding='utf-8') as f : json.dump(data, f, ensure_ascii=False, indent=4)
+
+
+
 def requests_get(url,params=None,headers=None) :
-    global PUBLIC_TIMEOUT
 
     p("requests_get url :",url)
     p("requests_get params :",params)
     p("requests_get headers :",headers)
-    p("requests_get PUBLIC_TIMEOUT :",PUBLIC_TIMEOUT)
 
 
     resp = requests.get(
             url, 
             params=params,
             headers=headers,
-            timeout=PUBLIC_TIMEOUT
+            timeout=T.t()
         )
     p("resp :",resp)
     return resp
 
 
 def grammer_requests_get(news_id,) :
-    global PUBLIC_TIMEOUT
     API_URL = "https://api2.easyjapanese.net/api/news/get-list"
     
     HEADERS = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
     }
     # 1) API 호출
+    print("news_id :",news_id)
     params = {"news_id": news_id, "lang": "ko", "furigana": True}
-    resp = requests.get(API_URL, params=params, headers=HEADERS, timeout=PUBLIC_TIMEOUT)
+    resp = requests.get(API_URL, params=params, headers=HEADERS, timeout=T.t())
+    print("resp.url :",resp.url)
     return resp
     
     
+
+def _fsync_dir(path: str) -> None:
+    """디렉터리 메타데이터까지 내구성 보장(가능할 때만)."""
+    try:
+        dir_path = os.path.dirname(os.path.abspath(path)) or "."
+        fd = os.open(dir_path, os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    except Exception:
+        # 일부 OS/FS(특히 Windows)에서는 디렉터리 fsync 불가
+        pass
+
+
+
+
+@contextlib.contextmanager
+def file_lock(path: str):
+    """
+    path+'.lock' 파일에 대해 가능한 경우 파일잠금 적용.
+    프로세스 간 동시 쓰기 가능성이 있을 때 atomic_json_write 앞뒤로 감싸서 사용:
+        with file_lock(URL_JSON_DEFAULT_PATH):
+            atomic_json_write(URL_JSON_DEFAULT_PATH, data)
+    """
+    lock_file = open(path + ".lock", "a+", encoding="utf-8", errors="ignore")
+    try:
+        locked = False
+        try:
+            import fcntl  # POSIX
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            locked = True
+        except Exception:
+            try:
+                import msvcrt  # Windows
+                msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
+                locked = True
+            except Exception:
+                # 락 미지원 환경: 베스트 에포트
+                pass
+        yield
+    finally:
+        try:
+            if locked:
+                try:
+                    import fcntl
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                except Exception:
+                    try:
+                        import msvcrt
+                        msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+                    except Exception:
+                        pass
+        finally:
+            lock_file.close()
+
+
+
+
+
 
 def p(*values,is_print=True):
     return
@@ -110,6 +289,30 @@ def p(*values,is_print=True):
                 s = f"{s} {values[i]}"
         
         print(s)
+
+#GlobalTimeoutBackoff
+class T:
+    _lock = threading.RLock()
+    _value = 5
+    
+    @classmethod
+    def t(cls):
+        #current_timeout
+        with cls._lock:
+            return cls._value
+    
+    @classmethod
+    def s(cls):
+        #report_success
+        with cls._lock:
+            cls._value = 5
+
+
+    @classmethod
+    def f(cls):
+        #report_fail
+        with cls._lock:
+            cls._value = cls._value + 1
 
 
 class UrlExtractor:
@@ -153,8 +356,17 @@ class UrlExtractor:
                 "Chrome/124.0 Safari/537.36"
             )
         }
-        resp = self.session.get(self.url, headers=headers, timeout=self.timeout)
-        resp.raise_for_status()
+        while True : 
+            try : 
+                resp = self.session.get(self.url, headers=headers, timeout=self.timeout)
+                resp.raise_for_status()
+                T.s()
+                break
+            except Timeout:
+                T.f()
+                p(f"fallback_extract_from_html Timeout {self.url}")
+                continue
+
         resp.encoding = resp.apparent_encoding or resp.encoding
         return resp.text, str(resp.url)
 
@@ -451,7 +663,6 @@ class SentenceExtractor:
     # ---------------
     @classmethod
     def fetch_grammar_examples(cls, news_id: str, lang_code: str, url) -> list[str]:
-        global PUBLIC_TIMEOUT
         p("SentenceExtractor fetch_grammar_examples lang_code :",lang_code)
         p("SentenceExtractor fetch_grammar_examples news_id :",news_id)
         p("SentenceExtractor fetch_grammar_examples url :",url)
@@ -468,10 +679,10 @@ class SentenceExtractor:
             try : 
                 resp = grammer_requests_get(news_id)
                 resp.raise_for_status()
-                PUBLIC_TIMEOUT = 5
+                T.s()
                 break
             except Timeout:
-                PUBLIC_TIMEOUT = PUBLIC_TIMEOUT + 1
+                T.f()
                 p(f"fallback_extract_from_html Timeout {url}")
                 continue
 
@@ -523,7 +734,6 @@ class SentenceExtractor:
 
     @classmethod
     def fallback_extract_from_html(cls, url: str) -> list[str]:
-        global PUBLIC_TIMEOUT
 
         resp = None
 
@@ -532,10 +742,10 @@ class SentenceExtractor:
                 p("SentenceExtractor fetch_grammar_examples url :",url)
                 resp = requests_get(url, headers={"User-Agent": cls.USER_AGENT})
                 resp.raise_for_status()
-                PUBLIC_TIMEOUT = 5
+                T.s()
                 break
             except Timeout:
-                PUBLIC_TIMEOUT = PUBLIC_TIMEOUT + 1
+                T.f()
                 p(f"fallback_extract_from_html Timeout {url}")
                 continue
 
@@ -551,7 +761,6 @@ class SentenceExtractor:
     # ---------------
     @classmethod
     def fetch_html(cls, url: str) -> str:
-        global PUBLIC_TIMEOUT 
 
         resp = None
 
@@ -559,11 +768,11 @@ class SentenceExtractor:
             try:
                 resp = requests_get(url, headers={"User-Agent": cls.USER_AGENT})
                 resp.raise_for_status()
-                PUBLIC_TIMEOUT = 5
+                T.s()
                 break
             except Timeout:
-                PUBLIC_TIMEOUT = PUBLIC_TIMEOUT + 1
-                p(f"fetch_html Timeout {PUBLIC_TIMEOUT} {url}")
+                T.f()
+                p(f"fetch_html Timeout {url}")
                 continue
 
         if not resp.encoding:
@@ -767,6 +976,7 @@ class SentenceExtractor:
 def url_roller(url) :
     urlExtractor = _ExtractorNamespace()
     extracted_urls = urlExtractor.main(url)
+    print("len(extracted_urls) :",len(extracted_urls))
     apply_urls_json_in_schedule(extracted_urls)
 
 
@@ -781,18 +991,22 @@ def sentence_roller(url) :
 
 def roller_cell() :
     url = url_stage_and_pop()
-    p("url :",url)
-    p("type(url) :",type(url))
-
-    t_url, t_sen = None, None
+    print("url :",url)
     if url : 
+        t_url, t_sen = None, None
         t_url = threading.Thread(target=url_roller,args=(url,)) ; t_url.start()
         t_sen = threading.Thread(target=sentence_roller,args=(url,)) ; t_sen.start()
 
         t_url.join()
         t_sen.join()
 
-    url_viewed_and_pop(url)
+        url_viewed_and_pop(url)
+    else :
+        
+        t_url = None
+        t_url = threading.Thread(target=url_roller,args=("https://japanese.todaiinews.com/",)) ; t_url.start()
+        t_url.join()
+
 
     
 
@@ -822,10 +1036,10 @@ def apply_sentences(sentences,grammers) :
         with open(SENTENCE_JSON_DEFAULT_PATH, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
-        data["data"]
         result_list = []
         result_list_lock = Lock()
         threads = []
+        sentences = list(set(sentences))
         for sentence in sentences :
             t = threading.Thread(target=is_in_list,args=(
                     result_list,
@@ -838,10 +1052,12 @@ def apply_sentences(sentences,grammers) :
         
         for t in threads : t.join()
 
+        result_list = list(set(result_list))
         data['data'].extend(result_list)
 
-        with open(SENTENCE_JSON_DEFAULT_PATH, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
+        atomic_json_write(SENTENCE_JSON_DEFAULT_PATH, data)
+
+        #with open(SENTENCE_JSON_DEFAULT_PATH, 'w', encoding='utf-8') as f:json.dump(data, f, ensure_ascii=False, indent=4)
 
 
             
@@ -866,23 +1082,26 @@ def apply_sentences(sentences,grammers) :
         
         for t in threads : t.join()
 
+        result_list = list(set(result_list))
         data['data'].extend(result_list)
 
-        with open(GRAMMER_JSON_DEFAULT_PATH, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
+        atomic_json_write(GRAMMER_JSON_DEFAULT_PATH, data)
+
+        #with open(GRAMMER_JSON_DEFAULT_PATH, 'w', encoding='utf-8') as f:json.dump(data, f, ensure_ascii=False, indent=4)
 
 
 def apply_urls_json_in_schedule(urls):
+    #추출한 새로운 url 을 스케줄에 적용하기
     global URL_JSON_LOCK
     with URL_JSON_LOCK:
         data = None
         with open(URL_JSON_DEFAULT_PATH, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
-        json_urls = data['schedule_url_list']
+        json_urls = d(data['viewed_url_list']+data['stage_url_list']+data['schedule_url_list'])
 
-        result_list_lock = Lock()
         result_list = []
+        result_list_lock = Lock()
         threads = []
 
         for url in urls :
@@ -897,10 +1116,12 @@ def apply_urls_json_in_schedule(urls):
 
         for t in threads : t.join()
 
+        result_list = list(set(result_list))
         data['schedule_url_list'].extend(result_list)
 
-        with open(URL_JSON_DEFAULT_PATH, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
+        atomic_json_write(URL_JSON_DEFAULT_PATH, data)
+        
+        #with open(URL_JSON_DEFAULT_PATH, 'w', encoding='utf-8') as f:json.dump(data, f, ensure_ascii=False, indent=4)
 
 def url_stage_and_pop() :
     global URL_JSON_LOCK
@@ -918,10 +1139,12 @@ def url_stage_and_pop() :
 
         if not return_url : 
             return None
+        
         data['stage_url_list'].append(return_url)
 
-        with open(URL_JSON_DEFAULT_PATH, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
+        atomic_json_write(URL_JSON_DEFAULT_PATH, data)
+
+        #with open(URL_JSON_DEFAULT_PATH, 'w', encoding='utf-8') as f:json.dump(data, f, ensure_ascii=False, indent=4)
         return return_url
     
 
@@ -932,68 +1155,88 @@ def url_viewed_and_pop(url) :
         with open(URL_JSON_DEFAULT_PATH, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
-        if url in data['schedule_url_list']:
-            data['schedule_url_list'].remove(url)
+        if url in data['stage_url_list']:
+            data['stage_url_list'].remove(url)
+            data['viewed_url_list'].append(url)
 
-        data['viewed_url_list'].append(url)
+        atomic_json_write(URL_JSON_DEFAULT_PATH, data)
 
-        with open(URL_JSON_DEFAULT_PATH, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-
-
+        #with open(URL_JSON_DEFAULT_PATH, 'w', encoding='utf-8') as f: json.dump(data, f, ensure_ascii=False, indent=4)
 
 
 
 
 
-def apply_urls(urls):
-    global URL_JSON_LOCK
-    global URL_JSON_DEFAULT_PATH
-
-    with URL_JSON_LOCK:
-        urls = list(urls)  # why: workers need indexable, mutable sequence
-
-        with open(URL_JSON_DEFAULT_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
 
 
-        existing = (data.get("viewed_url_list")+data.get("stage_url_list")+data.get("schedule_url_list"))
 
-        # why: use dict for O(1) membership without Set
-        existing_map = {k: True for k in existing}
-
-        threads = []
-        for idx in range(len(urls)):
-            t = threading.Thread(target=is_in_list, args=(urls, idx, existing_map))
-            t.start()
-            threads.append(t)
-
-        for t in threads:
-            t.join()
-
-        result = []
-        for u in urls:
-            if u is not False:
-                result.append(u)
-
-    return result
-
-def monitor_and_run():
+def run():
+    THREAD_COUNT = 10
+    threads = [threading.Thread(target=roller_cell) for _ in range(THREAD_COUNT)]
+    print("threads :",threads)
+    print("len(threads) :",len(threads))
+    for i in threads :
+        print(i,i.ident)
+    for i in threads :
+        i.start()
     while True:
-        cpu_usage = psutil.cpu_percent(interval=1)
-        memory_usage = psutil.virtual_memory().percent
+        for i in range(len(threads)) :
+            if not threads[i].is_alive() :
+                threads[i] = threading.Thread(target=roller_cell)
+                threads[i].start()
+                
+            #p(f"Started roller_cell thread | CPU: {cpu_usage}% | RAM: {memory_usage}%")
 
-        if cpu_usage < 90 and memory_usage < 90:
-            t = threading.Thread(target=roller_cell, daemon=True)
-            t.start()
-            p(f"Started roller_cell thread | CPU: {cpu_usage}% | RAM: {memory_usage}%")
-        else:
-            p(f"Resource high, skipping start | CPU: {cpu_usage}% | RAM: {memory_usage}%")
+        
 
-        time.sleep(1)
 
+
+
+
+
+
+def monitor():
+    
+    while True:
+        data = None
+        try : 
+            with open(URL_JSON_DEFAULT_PATH, 'r', encoding='utf-8') as f: 
+                data = json.load(f)
+
+                url_sch_list = len(data["schedule_url_list"])
+                url_sta_list = len(data["stage_url_list"])
+                url_vie_list = len(data["viewed_url_list"])
+
+            sen_list = None
+            with open(SENTENCE_JSON_DEFAULT_PATH, 'r', encoding='utf-8') as f: 
+                data = json.load(f)
+                sen_list = len(data["data"])
+
+            gra_list = None
+            with open(GRAMMER_JSON_DEFAULT_PATH, 'r', encoding='utf-8') as f: 
+                data = json.load(f)
+                gra_list = len(data["data"])
+            print(f"{url_sta_list}|{url_sch_list}|{url_vie_list}|{sen_list}|{gra_list}|{T.t()}")
+        except PermissionError : pass
+
+        time.sleep(0.05)
 
 
 if __name__ == '__main__':
-    monitor_and_run()
+    threading.Thread(target=monitor,daemon=True).start()
+    run()
+    '''
+    for i in range(20) :
+        threading.Thread(target=monitor_and_run,daemon=True).start()
+    while True : 
+        
+        cpu_usage = psutil.cpu_percent(interval=1)
+        memory_usage = psutil.virtual_memory().percent
+        #print(f"{cpu_usage}|{memory_usage}|{T.t()}")
+        
+
+
+
+        time.sleep(0.05)
+    '''
 
