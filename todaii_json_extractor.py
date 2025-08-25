@@ -1,6 +1,6 @@
 from __future__ import annotations
 from __future__ import print_function
-MULTIPROCESSING_COUNT = 10
+MULTIPROCESSING_COUNT = 20
 from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
