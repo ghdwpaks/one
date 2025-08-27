@@ -193,8 +193,13 @@ while True :
         custom_cls()
         continue
     elif last_key == "f" or last_key == ":" or last_key == ";":
-        
-        user_input = input(":")
+        while True :
+            try : 
+                user_input = input(":")
+                break
+            except KeyboardInterrupt :
+                continue
+
         dict_objects[i][f"edited_{selected_type}"] = user_input
         dict_objects[i][f"original_{selected_type}_selected"] = False
         i += 1
@@ -247,7 +252,7 @@ sys.stdout = original_stdout
 captured_output = buffer.getvalue()
 
 # 저장
-with open(f"z_out{datetime.now().strftime("%H%M%S")}.csv", "w", encoding="utf-8") as f:
+with open(f"{datetime.now().strftime("%H%M%S")}.csv", "w", encoding="utf-8") as f:
     f.write(captured_output)
 
-print(f'출력 내용이 z_out{datetime.now().strftime("%H%M%S")}.csv 에 저장되었습니다.')
+print(f'출력 내용이 {datetime.now().strftime("%H%M%S")}.csv 에 저장되었습니다.')
