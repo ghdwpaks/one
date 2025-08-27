@@ -45,7 +45,7 @@ import os
 import subprocess
 import json
 import random
-import tool
+from tools.get_chrome_path import get_chrome_path
 
 font_size = 15#32,64
 font_info = {
@@ -551,7 +551,7 @@ class FlashcardApp(ctk.CTk):
 
     def search_radical(self, event=None):
         url = f"https://ja.dict.naver.com/#/search?query={self.p_label.cget("text")}"
-        webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(tool.get_chrome_path()))
+        webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(get_chrome_path()))
         webbrowser.get('chrome').open(url)
         
     def search(self, target=None, word=None, event=None):
@@ -615,13 +615,13 @@ class FlashcardApp(ctk.CTk):
             if not target in [11,12,13] :
                 url = f"https://ja.dict.naver.com/#/search?query={target}"
                 
-                webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(tool.get_chrome_path()))
+                webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(get_chrome_path()))
                 webbrowser.get('chrome').open(url)
 
             else : 
                 if target == 11 : 
                     target = self.word_label.cget("text")
-                    pyperclip.copy(f"{target}가 어떤 부속 한자로 이루어져있는지 알려줘. 부속 한자의 뜻, 역할, 암시, 그리고 이 부속한자들의 전체적인 의미에 대해서 알려줘.")
+                    pyperclip.copy(f"= {target}")
                 elif target == 12 : 
                     target = self.word_label.cget("text")
                     pyperclip.copy(f"{target}")
@@ -669,7 +669,7 @@ class FlashcardApp(ctk.CTk):
         
         url = f"https://ja.dict.naver.com/#/search?query={target}"
         
-        webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(tool.get_chrome_path()))
+        webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(get_chrome_path()))
         webbrowser.get('chrome').open(url)
         
 # 앱 실행

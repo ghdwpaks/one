@@ -52,7 +52,7 @@ def open_csv(self=None,called_from_one=None):
     if called_from_one : 
         return file_path
     self.csv_file_path = file_path
-    self.data = tool.read_and_process_csv(file_path=self.csv_file_path)
+    self.data = read_and_process_csv(file_path=self.csv_file_path)
     if self.data:
         self.fieldnames = list(self.data[0].keys())
     else:
