@@ -289,13 +289,13 @@ print("]")
 sys.stdout = original_stdout
 
 # 버퍼 내용 가져오기
-captured_output = buffer.getvalue()
+captured_word_output = buffer.getvalue()
 
 # 저장
-with open("captured_output.txt", "w", encoding="utf-8") as f:
-    f.write(captured_output)
+with open("captured_word_output.txt", "w", encoding="utf-8") as f:
+    f.write(captured_word_output)
 
-print("출력 내용이 captured_output.txt에 저장되었습니다.")
+print("출력 내용이 captured_word_output.txt에 저장되었습니다.")
 
 
 

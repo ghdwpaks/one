@@ -122,7 +122,7 @@ def custom_cls() :
 
 dict_objects = None
 
-file_path = "captured_output.txt"
+file_path = "captured_word_output.txt"
 dict_objects = extract_dicts(file_path)
 print("dict_objects :",dict_objects)
 print("type(dict_objects) :",type(dict_objects))
@@ -249,10 +249,10 @@ for i in dict_objects :
 sys.stdout = original_stdout
 
 # 버퍼 내용 가져오기
-captured_output = buffer.getvalue()
+captured_word_output = buffer.getvalue()
 
 # 저장
 with open(f"{datetime.now().strftime("%H%M%S")}.csv", "w", encoding="utf-8") as f:
-    f.write(captured_output)
+    f.write(captured_word_output)
 
 print(f'출력 내용이 {datetime.now().strftime("%H%M%S")}.csv 에 저장되었습니다.')
