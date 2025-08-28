@@ -1,5 +1,4 @@
-csv_file_path = "z_out175734_121_140.csv"
-
+csv_file_path = "words\\1000\\1000_kan_21_40.csv"
 #Caps Lock 주의!!!
 
 #1 : 네이버 일본어 사전에서 부수 검색
@@ -61,7 +60,7 @@ font_info = {
     "kanji_font_size":30,#360,240
 }
 
-font_size = 64#32,64
+font_size = 32#32,64
 font_info = {
     "title_label":20,
     "info_label":14,
@@ -72,7 +71,7 @@ font_info = {
     "m_label":font_size,
     "km_label":font_size,
     "end_label":font_size,
-    "kanji_font_size":420,#360,240,420
+    "kanji_font_size":360,#360,240,420
 }
 
 # CSV 파일 읽기
@@ -228,7 +227,7 @@ class FlashcardApp(ctk.CTk):
         self.progress_bar.pack(pady=10)
         self.progress_bar.set(0)  # 초기 진행률: 0%
 
-        shortcuts = self.load_shortcuts_from_json('setting.json')
+        shortcuts = self.load_shortcuts_from_json('tools/setting.json')
         self.bind_shortcuts_from_setting(shortcuts)
 
 
@@ -331,7 +330,7 @@ class FlashcardApp(ctk.CTk):
             class_list = a.get("class", [])
             if "ajax" in class_list and "color1" in class_list:
                 return_url = f"{a.get("href")}#m_kousei"
-                webbrowser.open(return_url)
+                #webbrowser.open(return_url)
                 return return_url
             
         print(f"unicoded_word : {unicoded_word} / class에 'ajax'와 'color1'이 모두 포함된 <a> 태그를 찾을 수 없습니다.")
@@ -339,7 +338,7 @@ class FlashcardApp(ctk.CTk):
             class_list = a.get("class", [])
             if "ajax" in class_list :
                 return_url = f"{a.get("href")}#m_kousei"
-                webbrowser.open(return_url)
+                #webbrowser.open(return_url)
                 return return_url
             
         print(f"unicoded_word : {unicoded_word} / class에 'ajax'가 모두 포함된 <a> 태그를 찾을 수 없습니다.")
