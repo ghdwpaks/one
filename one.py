@@ -1,4 +1,4 @@
-csv_file_path = "words\\1000\\1000_kan_21_40.csv"
+csv_file_path = "words\\1000\\1000_kan_1_100_infocus.csv"
 #Caps Lock 주의!!!
 
 #1 : 네이버 일본어 사전에서 부수 검색
@@ -60,7 +60,7 @@ font_info = {
     "kanji_font_size":30,#360,240
 }
 
-font_size = 32#32,64
+font_size = 32#32,64,48
 font_info = {
     "title_label":20,
     "info_label":14,
@@ -71,7 +71,7 @@ font_info = {
     "m_label":font_size,
     "km_label":font_size,
     "end_label":font_size,
-    "kanji_font_size":360,#360,240,420
+    "kanji_font_size":240,#360,240,420
 }
 
 # CSV 파일 읽기
@@ -104,7 +104,7 @@ def read_and_process_csv(file_path):
 
 
 # 단일한자데이터시트 예시
-single_kanji_data = [{'k': '定', 'km': '(결)정', 'p': '宀 (3획)', 's': 'じょう·てい', 'm': 'さだまる·さだめる·さだか', 'knows': 0}]
+single_kanji_data = [{'k': '取', 'km': '쥐다', 'p': '又', 's': 'しゅ', 'm': 'とる', 'knows': 0}]
 
 
 #file_path = tool.open_csv(called_from_one=True)
@@ -557,6 +557,11 @@ class FlashcardApp(ctk.CTk):
 
         #target 은 숫자, word 는 (들어온다면) 한자 정보 인입
 
+        print("self :",self)
+        print("target :",target)
+        print("word :",word)
+        print("event :",event)
+
 
         if word : 
             #복수한자를 시험보는 경우
@@ -598,7 +603,7 @@ class FlashcardApp(ctk.CTk):
             elif target == 4 : #한국어 뜻
                 target = self.km_label.cget("text")
             elif target == 3 : #훈독
-                if event and event.state == 12 :
+                if event and event.state in [12,44] :
                     #ctrl 이 눌렸을때.
                     kanji = self.word_label.cget("text")
                     targets = self.m_label.cget("text").split("·")
@@ -607,7 +612,7 @@ class FlashcardApp(ctk.CTk):
                         target_list.append(f"{kanji} {target}")
                     self.open_txt_on_vscode(target_list)
                     return
-                elif event and event.state == 8 :
+                elif event and event.state in [8,40] :
                     #ctrl 이 눌리지 않을때 
                     target = self.m_label.cget("text")
 
