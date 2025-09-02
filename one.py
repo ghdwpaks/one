@@ -557,12 +557,6 @@ class FlashcardApp(ctk.CTk):
 
         #target 은 숫자, word 는 (들어온다면) 한자 정보 인입
 
-        print("self :",self)
-        print("target :",target)
-        print("word :",word)
-        print("event :",event)
-
-
         if word : 
             #복수한자를 시험보는 경우
             if target == 1 : #검색
