@@ -37,17 +37,15 @@ def speak_words_from_csv(csv_path: str):
         japanese_word = str(row["T"])
         korean_meaning = str(row["D"])
 
-        print(f"한국어 뜻: {korean_meaning}")
-        speak_text(korean_meaning, lang="ja")
-
-        print(f"일본어: {japanese_word}")
-        speak_text(japanese_word, lang="ko")
+        print(f"{japanese_word} : {str(row['P'])} : {korean_meaning}")
+        speak_text(japanese_word, lang="ja")
+        speak_text(korean_meaning, lang="ko")
 
         
         beep_sound()
 
 
 if __name__ == "__main__":
-    csv_file = "0731.csv"  # 같은 폴더에 있는 CSV
+    csv_file = "words\\loop_target.csv"
     while True :
         speak_words_from_csv(csv_file)
