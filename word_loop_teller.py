@@ -33,6 +33,7 @@ def speak_text(text: str, lang: str):
 
 def speak_words_from_csv(csv_path: str):
     df = pd.read_csv(csv_path)
+    df = df.sample(frac=1).reset_index(drop=True)
     for _, row in df.iterrows():
         japanese_word = str(row["T"])
         korean_meaning = str(row["D"])
