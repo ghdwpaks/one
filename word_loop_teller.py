@@ -30,6 +30,22 @@ def speak_text(text: str, lang: str):
         except PermissionError:
             pass
 
+def is_jp(word: str):
+    for ch in word:
+        code = ord(ch)
+        # Hangul syllables
+        if 0xAC00 <= code <= 0xD7AF:
+            return "ko"
+        # Hiragana
+        elif 0x3040 <= code <= 0x309F:
+            return "ja"
+        # Katakana
+        elif 0x30A0 <= code <= 0x30FF:
+            return "ja"
+        # CJK Unified Ideographs (Kanji)
+        elif 0x4E00 <= code <= 0x9FFF:
+            return "ja"
+    return "ko"
 
 def speak_words_from_csv(csv_path: str):
     df = pd.read_csv(csv_path)
@@ -39,14 +55,14 @@ def speak_words_from_csv(csv_path: str):
         korean_meaning = str(row["D"])
 
         print(f"{japanese_word} : {str(row['P'])} : {korean_meaning}")
-        speak_text(japanese_word, lang="ja")
-        speak_text(korean_meaning, lang="ko")
+        speak_text(japanese_word, lang=is_jp(japanese_word))
+        speak_text(korean_meaning, lang=is_jp(korean_meaning))
 
         
         beep_sound()
 
 
 if __name__ == "__main__":
-    csv_file = "words\\loop_target.csv"
+    csv_file = "words\\230835\\230835_1_60_focus.csv"
     while True :
         speak_words_from_csv(csv_file)
