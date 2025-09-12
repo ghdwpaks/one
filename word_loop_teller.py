@@ -4,11 +4,15 @@ import pandas as pd
 from gtts import gTTS
 from playsound import playsound
 import winsound
-
+import uuid
 import ctypes
 ctypes.windll.kernel32.SetThreadExecutionState(
     0x80000000 | 0x00000001 | 0x00000002
 )
+
+
+TEMP_DIR = os.environ.get("TEMP", "setter\\temps")
+os.makedirs(TEMP_DIR, exist_ok=True)  # 경로 없으면 생성
 
 
 def beep_sound():
@@ -17,10 +21,13 @@ def beep_sound():
 def speak_text(text: str, lang: str):
     if not text.strip():
         return
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
-        tts = gTTS(text=text, lang=lang)
-        tts.save(fp.name)
-        temp_path = fp.name
+
+    # 안전한 랜덤 파일명 생성
+    filename = f"tts_{uuid.uuid4().hex}.mp3"
+    temp_path = os.path.join(TEMP_DIR, filename)
+
+    tts = gTTS(text=text, lang=lang)
+    tts.save(temp_path)
 
     try:
         playsound(temp_path)
