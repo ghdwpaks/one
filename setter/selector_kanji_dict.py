@@ -1,3 +1,4 @@
+#탈출키 : =
 dict_objects = [
 {'k': '人', 's': 'じん·にん', 'm': 'ひと', 'p': '人', 'km': "인(간)"},
 {'k': '日', 's': 'じつ·にち', 'm': 'か·ひ', 'p': '日', 'km': "일"},
@@ -135,8 +136,6 @@ print("type(dict_objects) :",type(dict_objects))
 
 print("추출된 dict 객체 리스트:")
 
-{'k': '立', 's': 'りつ·りゅう', 'm': 'たつ·たてる', 'p': '立', 'km': ''},
-
 
 
 for i in range(len(dict_objects)):
@@ -265,8 +264,8 @@ sys.stdout = original_stdout
 captured_word_output = buffer.getvalue()
 
 # 저장
-with open(f"{datetime.now().strftime("%H%M%S")}.csv", "w", encoding="utf-8") as f:
+with open(f"temps\\{datetime.now().strftime("%H%M%S")}.csv", "w", encoding="utf-8") as f:
     f.write(captured_word_output)
 
-print(f'출력 내용이 {datetime.now().strftime("%H%M%S")}.csv 에 저장되었습니다.')
+print(f'출력 내용이 temps\\{datetime.now().strftime("%H%M%S")}.csv 에 저장되었습니다.')
 
