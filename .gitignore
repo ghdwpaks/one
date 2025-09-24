@@ -1,3 +1,11 @@
 *.pyc
 words/
 words/*
+setter/temps/
+setter/temps/*
+setter/logs/
+setter/logs/*
+setter/quarantine/
+setter/quarantine/*
+setter/batch_artifacts/
+setter/batch_artifacts/*
