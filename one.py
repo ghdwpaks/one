@@ -1,4 +1,4 @@
-csv_file_path = "words\\1000\\1000_kan_1_100_infocus.csv"
+csv_file_path = "words\\230835\\230835_161_180.csv"
 #Caps Lock 주의!!!
 
 #1 : 네이버 일본어 사전에서 부수 검색
@@ -149,6 +149,31 @@ class FlashcardApp(ctk.CTk):
         # 첫 화면은 '뜻 화면'
         self.show_word_screen()
 
+        self.rebind_keys()
+
+        self.resizable(True, True)
+
+        self.num_parts = 1  # 분할 개수
+        self.current_part = 1  # 현재 선택된 부분
+
+
+        # 진행 바 추가
+        self.progress_bar = ctk.CTkProgressBar(self, width=300)
+        self.progress_bar.pack(pady=10)
+        self.progress_bar.set(0)  # 초기 진행률: 0%
+
+        shortcuts = self.load_shortcuts_from_json('tools/setting.json')
+        self.bind_shortcuts_from_setting(shortcuts)
+
+
+        # 초기 화면 구성
+        self.show_initial_screen()
+
+        #self.focus_set()
+
+    
+    def rebind_keys(self):
+        
         # 키보드 입력 바인딩
         self.bind("<Up>", self.toggle_screen)  # 화살표 위쪽 키로 화면 전환
         
@@ -215,28 +240,6 @@ class FlashcardApp(ctk.CTk):
                 for mod, target in modifiers:
                     self.bind(f"{mod}{key}>", lambda event, w=key, t=target: self.search(target=t, word=w))
                     self.bind(f"{mod}{key.upper()}>", lambda event, w=key, t=target: self.search(target=t, word=w))
-
-        self.resizable(True, True)
-
-        self.num_parts = 1  # 분할 개수
-        self.current_part = 1  # 현재 선택된 부분
-
-
-        # 진행 바 추가
-        self.progress_bar = ctk.CTkProgressBar(self, width=300)
-        self.progress_bar.pack(pady=10)
-        self.progress_bar.set(0)  # 초기 진행률: 0%
-
-        shortcuts = self.load_shortcuts_from_json('tools/setting.json')
-        self.bind_shortcuts_from_setting(shortcuts)
-
-
-        # 초기 화면 구성
-        self.show_initial_screen()
-
-        #self.focus_set()
-
-
 
 
     def load_shortcuts_from_json(self,json_path):
@@ -500,6 +503,15 @@ class FlashcardApp(ctk.CTk):
     # '모르겠어요' 버튼 동작
     def unknown_action(self, event=None):
         self.next_card()
+        self.clear_event_buffer()
+
+    def clear_event_buffer(self):
+        # 모든 키 이벤트를 잠시 무시
+        self.unbind_all("<KeyPress>")
+        self.unbind_all("<KeyRelease>")
+        # 짧은 시간 후에 다시 바인딩 복구
+        self.after(10, self.rebind_keys)
+
 
     # '알겠어요' 버튼 동작
     def known_action(self, event=None):
@@ -509,6 +521,7 @@ class FlashcardApp(ctk.CTk):
         else : 
             current_kanji['knows'] = True  # knows 값 증가
         self.next_card()
+        self.clear_event_buffer()
 
     # 다음 카드로 이동
     def next_card(self,selected_end=False):
