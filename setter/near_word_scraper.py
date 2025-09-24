@@ -185,17 +185,16 @@ def run_kotobank(kanjis, pool_size, return_dict):
     return_dict["kotobank"] = all_titles
 
 def save_to_txt(final, filepath="./temps/near_words_result.txt"):
-    # 디렉토리 자동 생성
+    
     directory = os.path.dirname(filepath)
     if directory and not os.path.exists(directory):
         os.makedirs(directory)
 
-    # 파일 덮어쓰기
     with open(filepath, "w", encoding="utf-8") as f:
-        for word in final:
-            f.write(word + "\n")
+        f.write(json.dumps(final, ensure_ascii=False))
 
     print("Results saved to", filepath)
+
 
 def near_word_scraper_main_func() :
     filepath = "./temps/data.txt"
