@@ -125,7 +125,7 @@ for kan in k :
                     
         else:
             #뜻이 한개
-            뜻 = f"[{품사}] {뜻_부분}"
+            뜻 = f"{뜻_부분}"
 
         t = {
             "kan":kan,
@@ -150,7 +150,7 @@ for kan in k :
                 EC.presence_of_all_elements_located((By.CLASS_NAME, "has-saving-function"))
             )
         except TimeoutException :
-            t = {'k': kan, 's': '', 'm': '', 'p': ''}
+            t = {"k": kan, "s": "", "m": "", "p": ""}
             print("ghdwpaks"*3,t)
             l.append(t)
             continue
