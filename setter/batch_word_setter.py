@@ -1,5 +1,5 @@
 NEAR_SCRAPED_INFO_FILE_PATH = "temps/near_scraped_info.txt"
-
+RESULT_OUTPUT_FILE_PATH = "temps/result.txt"
 
 import ctypes; from time import sleep
 ES_CONTINUOUS,ES_SYSTEM_REQUIRED,ES_DISPLAY_REQUIRED=0x80000000,1,2
@@ -166,9 +166,12 @@ def load_data(file_path):
 
 
 
-def auto_checker_main(kanji_words,kanji_hatsuon,kanji_imi,hatsuon_is_good={},imi_is_good={}) :
-    
+def auto_checker_main(file_path) :
     global temp_path
+    global RESULT_OUTPUT_FILE_PATH
+
+    kanji_words, kanji_hatsuon, kanji_imi, hatsuon_is_good, imi_is_good = load_data(file_path=file_path)
+   
     
 
 
@@ -361,8 +364,7 @@ def auto_checker_main(kanji_words,kanji_hatsuon,kanji_imi,hatsuon_is_good={},imi
 
 
     all_passable = True
-    output_file = "result.txt"
-    with open(f"{temp_path}{output_file}", "w", encoding="utf-8") as f:
+    with open(f"{RESULT_OUTPUT_FILE_PATH}", "w", encoding="utf-8") as f:
         for i in kanji_words:
             if not hatsuon_is_good or not imi_is_good : 
                 all_passable = False
@@ -384,13 +386,11 @@ def auto_checker_main(kanji_words,kanji_hatsuon,kanji_imi,hatsuon_is_good={},imi
     return all_passable
 
 
-kanji_words, kanji_hatsuon, kanji_imi, hatsuon_is_good, imi_is_good = load_data(file_path=NEAR_SCRAPED_INFO_FILE_PATH)
-all_passable = auto_checker_main(kanji_words, kanji_hatsuon, kanji_imi, hatsuon_is_good, imi_is_good) 
+all_passable = auto_checker_main(file_path=NEAR_SCRAPED_INFO_FILE_PATH) 
 print("*"*88)
 if all_passable : raise()
-while True :     
-    kanji_words, kanji_hatsuon, kanji_imi, hatsuon_is_good, imi_is_good = load_data(file_path="temps/result.txt")
-    all_passable = auto_checker_main(kanji_words, kanji_hatsuon, kanji_imi, hatsuon_is_good, imi_is_good) 
+while True :
+    all_passable = auto_checker_main(file_path=RESULT_OUTPUT_FILE_PATH) 
     print("*"*88)
     if all_passable :
         break
