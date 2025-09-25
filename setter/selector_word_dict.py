@@ -122,7 +122,7 @@ def custom_cls() :
 
 dict_objects = None
 
-file_path = "captured_word_output.txt"
+file_path = "./temps/captured_word_output.txt"
 dict_objects = extract_dicts(file_path)
 print("dict_objects :",dict_objects)
 print("type(dict_objects) :",type(dict_objects))
