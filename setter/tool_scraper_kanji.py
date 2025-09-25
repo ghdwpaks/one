@@ -99,7 +99,6 @@ for kan in k :
         품사 = find_next_sentence(t, '단어장에 저장')
         뜻_부분 = find_next_sentence(t, '단어장에 저장', number=2)
         pattern = r'^\d+\.'
-        print("*"*88)
         if re.match(pattern, 뜻_부분):
             뜻_부분 = ""
             #뜻이 여러개
@@ -111,7 +110,7 @@ for kan in k :
                     break
 
 
-            뜻 += f"[{t_splited[i]}] "#품사
+            뜻 += f""
             while True :
                 i += 1
                 if len(t_splited)-1 <= i   : break # -1 은 문단 뒤에 있는 '민중서림 엣센스 일한사전' 부분을 없애기 위해서이다.
@@ -120,11 +119,7 @@ for kan in k :
                     i += 1
                     뜻 += f"{t_splited[i]}".strip().replace(".","")+" " # 의미
                 else :
-                    padding = ""
-                    if not 뜻[-1] == " " :
-                        padding = " "
-                    #품사가 있다는 의미
-                    뜻 += f"{padding}/ [{t_splited[i]}] "#품사
+                    뜻 += f""
                     
                     continue #품사 기록하고 처음으로 돌아가기
                     
@@ -132,13 +127,12 @@ for kan in k :
             #뜻이 한개
             뜻 = f"[{품사}] {뜻_부분}"
 
-        print("발음 :",발음)
-        print("뜻 :",뜻)
         t = {
             "kan":kan,
             "sound":발음,
             "mean":뜻.strip()
             }
+        #print("*"*88,"\n","ghdwpaks"*3,t)
         print("ghdwpaks"*3,t)
         l.append(t)
 
