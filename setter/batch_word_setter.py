@@ -15,6 +15,7 @@ import json
 from copy import deepcopy as d
 import threading
 import re
+import ast
 temp_path = "./temps/"
 local_batch_task_number = 0
 def do_task(tasks_sentences,filename,result_dict) :
@@ -78,7 +79,7 @@ def do_task(tasks_sentences,filename,result_dict) :
         '''
         
         b = client.batches.retrieve(batch.id)
-        if i % 5 == 0:
+        if i % 5 == 0 or i == 0:
             print(f"{local_batch_task_number}:{b.status}")
         if hasattr(b, "status") and b.status in [
             "in_progress",
@@ -142,7 +143,11 @@ def load_data(file_path):
     t=open(file_path,encoding="utf-8").read().splitlines()
 
     for i in t :
-        i = json.loads(i)
+        try : 
+            i = json.loads(i)
+        except json.decoder.JSONDecodeError :
+            i = ast.literal_eval(i)
+
         kanji_words.append(i["kan"])
         kanji_hatsuon.append(i["sound"])
         kanji_imi.append(i["mean"])
