@@ -20,9 +20,9 @@ csv_file_path = "words\\230835\\230835_161_180.csv"
 #Shift + x : 2번째 한자 복사
 #Shift + c : 3번째 한자 복사
 
-#Ctrl + z : 1번째 한자를 GPT에게 질문하는 글 복사
-#Ctrl + x : 2번째 한자를 GPT에게 질문하는 글 복사
-#Ctrl + c : 3번째 한자를 GPT에게 질문하는 글 복사
+#Ctrl + z : 1번째 한자가 포함된, 주변의 단어들을 출력
+#Ctrl + x : 2번째 한자가 포함된, 주변의 단어들을 출력
+#Ctrl + c : 3번째 한자가 포함된, 주변의 단어들을 출력
 
 #Alt + z : 1번째 한자를 kanji.jitenon.jp 에 검색하고, 구성한자를 VS Code 로 열기
 #Alt + x : 2번째 한자를 kanji.jitenon.jp 에 검색하고, 구성한자를 VS Code 로 열기
@@ -45,6 +45,16 @@ import subprocess
 import json
 import random
 from tools.get_chrome_path import get_chrome_path
+
+import ast
+import unicodedata
+
+
+NEAR_INFO_FILE_PATH = ""
+try : 
+    NEAR_INFO_FILE_PATH = f"{csv_file_path.split(".")[0]}_near.txt"
+except : pass
+
 
 font_size = 15#32,64
 font_info = {
@@ -121,6 +131,143 @@ ctk.set_default_color_theme("blue")  # 기본 색상 테마
 for row in test_data:
     if not "knows" in row.keys() :
         row['knows'] = 0
+
+
+class NearPrinter() :
+
+    space = 1
+    limit = 10
+
+    def load(fpath: str):
+        with open(fpath, "r", encoding="utf-8") as f:
+            return [ast.literal_eval(line) for line in f if line.strip()]
+
+
+    def w(txt: str) -> int:
+        n = 0
+        for ch in txt:
+            if unicodedata.east_asian_width(ch) in ("F", "W", "A"):
+                n += 2
+            else:
+                n += 1
+        return n
+
+    def setup_link_print(r: list[dict], sp: int):
+        if not r:
+            return []
+        mk = max(NearPrinter.w(x["kan"]) for x in r)
+        ms = max(NearPrinter.w(x["sound"]) for x in r)
+        out = {}
+        for x in r:
+            kp = " " * (mk - NearPrinter.w(x["kan"]) + sp)
+            spd = " " * (ms - NearPrinter.w(x["sound"]) + sp)
+            out[x["kan"]] = f"{x['kan']}{kp}{x['sound']}{spd}{x['mean'][:NearPrinter.limit]}"
+        return out
+
+    def print_link(text_data, kan, base="https://ja.dict.naver.com/#/search?query="):
+        print(f"{kan}\033]8;;{base}{kan}\033\\{str(text_data[kan]).replace(kan,'')}\033]8;;\033\\")
+
+    def sort_search_result(search_result, search_word, word_idx):
+        words = list(search_result.keys())
+
+        def first_occurrence(word):
+            try:
+                return word.index(search_word)
+            except ValueError:
+                return float('inf') 
+
+        sorted_keys = sorted(words, key=first_occurrence)
+
+        groups = {}
+        for w in sorted_keys:
+            idx = first_occurrence(w)
+            if idx not in groups:
+                groups[idx] = []
+            groups[idx].append(w)
+
+        if word_idx in groups:
+            final_keys = groups[word_idx] + [w for k in sorted(groups.keys()) if k != word_idx for w in groups[k]]
+        else:
+            final_keys = sorted_keys 
+
+        return {k: search_result[k] for k in final_keys}
+
+    def sort_search_result(search_result, search_word, word_idx, word_len=None):
+        """
+        search_result: dict, {단어: 설명}
+        search_word: str, 단일 글자
+        word_idx: int, 우선 출력할 그룹 인덱스
+        word_len: int or None, 그룹 내에서 우선 출력할 단어 길이
+        """
+        words = list(search_result.keys())
+
+        # 1️⃣ 단어별 search_word 등장 인덱스 계산
+        def first_occurrence(word):
+            try:
+                return word.index(search_word)
+            except ValueError:
+                return float('inf')  # search_word가 없으면 가장 뒤로
+
+        # 2️⃣ 등장 위치 기준으로 정렬
+        sorted_keys = sorted(words, key=first_occurrence)
+
+        # 3️⃣ 등장 위치별 그룹화
+        groups = {}
+        for w in sorted_keys:
+            idx = first_occurrence(w)
+            if idx not in groups:
+                groups[idx] = []
+            groups[idx].append(w)
+
+        # 4️⃣ word_idx 그룹 먼저
+        if word_idx in groups:
+            ordered_keys = groups[word_idx] + [w for k in sorted(groups.keys()) if k != word_idx for w in groups[k]]
+        else:
+            ordered_keys = sorted_keys
+
+        # 5️⃣ word_len 적용 (그룹 내 순서만 변경)
+        if word_len is not None:
+            final_keys = []
+            used = set()
+            # 선택한 그룹 먼저 길이 우선 정렬
+            first_group = [w for w in groups.get(word_idx, []) if w in ordered_keys]
+            len_matches = [w for w in first_group if len(w) == word_len]
+            others = [w for w in first_group if len(w) != word_len]
+            final_keys.extend(len_matches + others)
+            used.update(first_group)
+
+            # 나머지 그룹은 그대로
+            for w in ordered_keys:
+                if w not in used:
+                    final_keys.append(w)
+        else:
+            final_keys = ordered_keys
+
+        # 6️⃣ 딕셔너리 재생성
+        return {k: search_result[k] for k in final_keys}
+
+
+
+    def near_printer_main(search_kan,word_idx, word_len):
+        if not NEAR_INFO_FILE_PATH : 
+            print("disabled near service.")
+            return
+
+        
+        near_data = NearPrinter.load(NEAR_INFO_FILE_PATH)
+        search_result = NearPrinter.setup_link_print(
+                [x for x in near_data if search_kan in x["kan"]], 
+                NearPrinter.space
+            )
+        
+        sorted_search_result = NearPrinter.sort_search_result(search_result, search_kan, word_idx,word_len)
+
+        for line in sorted_search_result:
+            NearPrinter.print_link(sorted_search_result, line)
+
+
+
+
 
 class FlashcardApp(ctk.CTk):
     def __init__(self):
@@ -579,8 +726,11 @@ class FlashcardApp(ctk.CTk):
                 target = self.word_label.cget("text")[self.search_keys.index(word)]
                 pyperclip.copy(f"{target}")
             elif target == 3 : #GPT 질문 복사
-                target = self.word_label.cget("text")[self.search_keys.index(word)]
-                pyperclip.copy(f"{target}가 어떤 부속 한자로 이루어져있는지 알려줘. 부속 한자의 뜻, 역할, 암시, 그리고 이 부속한자들의 전체적인 의미에 대해서 알려줘.")
+                word_idx = self.search_keys.index(word)
+                target_word = self.word_label.cget("text")
+                target_kan = target_word[word_idx]
+                NearPrinter.near_printer_main(target_kan,word_idx,len(target_word))
+                #pyperclip.copy(f"{target}가 어떤 부속 한자로 이루어져있는지 알려줘. 부속 한자의 뜻, 역할, 암시, 그리고 이 부속한자들의 전체적인 의미에 대해서 알려줘.")
             elif target == 4 : 
                 target = self.word_label.cget("text")[self.search_keys.index(word)]
                 url = self.open_kanji_detail_by_unicoded_word(f"{format(ord(target), '04X')}")
