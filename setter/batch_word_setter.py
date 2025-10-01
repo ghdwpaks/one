@@ -4,7 +4,7 @@ RESULT_OUTPUT_FILE_PATH = "temps/result.txt"
 import ctypes; from time import sleep
 ES_CONTINUOUS,ES_SYSTEM_REQUIRED,ES_DISPLAY_REQUIRED=0x80000000,1,2
 ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS|ES_SYSTEM_REQUIRED|ES_DISPLAY_REQUIRED)
-
+from datetime import datetime
 
 # file: batch_test.py
 
@@ -384,6 +384,21 @@ def auto_checker_main(file_path) :
                 },
                 ensure_ascii=False
                 )+"\n")
+            
+    try : 
+        with open(f"temps/logs/res_{datetime.now().strftime('%Y%m%d%H%M%S')}.txt", "w", encoding="utf-8") as f:
+            for i in kanji_words:
+                f.write(json.dumps(
+                    {
+                        "kan": kanji_words[i], 
+                        "sound": right_hatsuon[i], 
+                        "mean": right_imi[i], 
+                        "is_done_sound": hatsuon_is_good[i], 
+                        "is_done_mean": imi_is_good[i]
+                    },
+                    ensure_ascii=False
+                    )+"\n")
+    except : pass
     
     
 
