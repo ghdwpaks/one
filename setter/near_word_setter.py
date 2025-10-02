@@ -12,13 +12,27 @@ MAIN_RESULT_FILE_PATH = ""
 #MAIN_MIDDLE_OUT_FILE_PATH = "./temps/near_2_scraped_info.txt"
 #MAIN_RESULT_FILE_PATH = "./temps/near_3_info.txt"
 
-# 공통
+TASK_SUBJECT_LIST = ["hatsuon", "imi", "daily", "jlpt"]
+GEN_TASK_SUBJECT_LIST = ["hatsuon", "imi"]
+
+
+#GPT_MODEL = "gpt-4o-mini"
+GPT_MODEL = "gpt-5-nano"
+
+# 표준 라이브러리
 import os
 import re
 import time
 import subprocess
-from multiprocessing import Pool, cpu_count
+import json
+import ast
+import threading
+from pathlib import Path
+from urllib.parse import quote
+from multiprocessing import Pool, cpu_count, Process, Manager
 
+# 서드파티 라이브러리
+import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -27,19 +41,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
-
-# scrape_from_file_titles.py 전용
-from pathlib import Path
-from urllib.parse import quote
-from multiprocessing import Process, Manager
-import requests
-
-# tool_multi_scraper_kanji.py 전용
-import json
-import ast
 import openai
-
-import threading
 
 
 
@@ -47,9 +49,19 @@ api_key = os.getenv("OPENAI_API_KEY")
 if not api_key:
     raise RuntimeError("OPENAI_API_KEY 환경변수가 없습니다.")
 
+def custom_print(var,color="gr",end="\n") :
+    if color == "gr" :  print(f"\033[32m{str(var)}\033[0m",end=end)
+    elif color == "or" : print(f"\033[38;5;208m{str(var)}\033[0m",end=end)
+    elif color == "br" : print(f"\033[38;5;94m{str(var)}\033[0m",end=end)
+    elif color == "re" : print(f"\033[31m{str(var)}\033[0m",end=end)
+    elif color == "ye" : print(f"\033[33m{str(var)}\033[0m",end=end)
+    elif color == "bl" : print(f"\033[34m{str(var)}\033[0m",end=end)
+
+
 def get_prompt(prompt_type,parts) : 
     for i in range(len(parts)) :
         if not parts[i] : parts[i] = "없다"
+    
     if prompt_type == "ask_imi" : 
         return f"'{parts[0]}'에 (여러 뜻이 있더라도,) '가장 일반적이고 주된 의미'을 한국어로 단 하나만 출력해. '다른 설명, 괄호, 따옴표, 문장'은 절대 붙이지 말고, 한글 단어만 출력해."
     elif prompt_type == "ask_hatsuon" : 
@@ -58,29 +70,65 @@ def get_prompt(prompt_type,parts) :
         return f"'{parts[0]}'의 발음이 '{parts[1]}'이라는 주장이 있다. 맞으면 1, 틀리면 0. 숫자 하나만 출력해."
     elif prompt_type == "is_right_imi" : 
         return f"'{parts[0]}'의 의미가 '{parts[1]}'이라는 주장이 있다. 맞으면 1, 틀리면 0. 숫자 하나만 출력해."
-
-
-
+    elif prompt_type == "is_right_jlpt" : #is use in jlpt well
+        return f"JLPT N2에 합격하기 위해 '{parts[0]}' 를 외워야 하는 중요도를 판별하라. 필수라면 3, 외우면 도움이 되지만 필수는 아니면 2, 전혀 필요 없다면 1을 출력하라. 출력은 반드시 숫자 하나만 한다."
+    elif prompt_type == "is_right_daily" : #is use in daily well
+        return f"'{parts[0]}'가 일본의 일상생활에서 자주 사용되는 글자인지 판별하라. 자주 사용된다면 1, 그렇지 않다면 0을 출력하라. 출력은 숫자 하나만 한다."
+    
 
 def is_kanji_word(word):
     return bool(re.fullmatch(r'[\u4E00-\u9FFF]{2,}', word))
 
-def remove_square_brackets(text: str) -> str:
-    return re.sub(r"\[.*?\]", "", text)
+
+def to_dict(lst):
+    return dict([(i+1, v) for i, v in enumerate(lst)])
 
 def clean_up(s: str) -> str:
     try:
-        text = s.replace("[", "").replace("]", "")
+        '''
+        "["와 "]" 대괄호를 제거.
+        한글/영문/언더바 뒤에 붙은 마침표 "."를 찾아서 제거.
+
+        
+        앞뒤 공백을 제거.
+        정규식을 이용해 양 끝을 감싸고 있는 가장 바깥 괄호([, {, ()를 반복적으로 제거.
+        중첩된 바깥 괄호도 모두 제거.
+        끝에 붙은 마침표(.)나 쉼표(,)를 반복적으로 제거하고, 제거 후 남은 공백도 다시 정리.
+        마지막으로 정리된 문자열을 반환.
+
+        영문, 숫자, 언더바, 공백, 한글, 히라가나, 가타카나, 한자만 남기고 나머지 특수문자를 제거.
+        처리 과정에서 예외가 발생하면 오류 메시지를 출력하고 None을 반환.
+        '''
+        s = s.strip()
+        s = s.replace("[", "").replace("]", "")
         pattern = r"([가-힣a-zA-Z_])\."
-        replaced = re.sub(pattern, r"\1", text)
-        replaced = remove_square_brackets(replaced)
+        s = re.sub(pattern, r"\1", s)
+        s = s.strip()
+
+
+        s = s.strip()
+        # 양 끝의 공백 포함, 가장 바깥 괄호들 반복 제거
+        while re.match(r'^\s*[\[\{\(](.*)[\]\}\)]\s*$', s):
+            s = re.sub(r'^\s*[\[\{\(](.*)[\]\}\)]\s*$', r'\1', s)
+            s = s.strip(" \t\n\r")  # 중간에도 반복 제거
+        s = s.strip()
+
+
+        # 끝에 붙은 온점, 쉼표 제거
+        while s and s[-1] in '.,':
+            s = s[:-1].rstrip()
+
         return re.sub(
-            r"[^\w\s\uAC00-\uD7A3\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]", "", replaced
+            r"[^\w\s\uAC00-\uD7A3\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]", "", s
         )
     except Exception as e:
         print("clean_up e :", e)
         return None
     
+def only_number(s) :
+    return re.sub(r"\D", "", s)
+    
+
 def fetch_page(query, page, headers):
     url = "https://kotobank.jp/search"
     params = {"q": query, "p": page}
@@ -214,7 +262,6 @@ def run_jlpt(kanjis, pool_size, return_dict):
     result = []
     for r in jlpt_results:
         result.extend(r)
-    print("JLPT result:", result)
     return_dict["jlpt"] = result
 
 
@@ -263,31 +310,6 @@ def near_word_scraper_main_func() :
     save_to_txt(final)
 
 
-def remove_brackets(text):
-    numbered_bracket_pattern = re.compile(r"\d+\.\s*\([^)]+\)")
-    placeholders = {}
-
-    def protect_numbered_brackets(match):
-        placeholder = f"PLACEHOLDER_{len(placeholders)}"
-        placeholders[placeholder] = match.group(0)
-        return placeholder
-
-    protected_text = numbered_bracket_pattern.sub(protect_numbered_brackets, text)
-
-    def replace(match):
-        content = match.group(1)
-        if re.fullmatch(r"[\uAC00-\uD7AF]{1,3}", content):
-            return f"({content})"
-        else:
-            return ""
-
-    result = re.sub(r"\(([^)]+)\)", replace, protected_text)
-
-    for placeholder, original in placeholders.items():
-        result = result.replace(placeholder, original)
-
-    return result
-
 
 def find_next_sentence(text, keyword, number=1):
     sentences = text.split('\n')
@@ -318,12 +340,13 @@ def scrape_kanji(kan):
             except TimeoutException:
                 return {"kan": kan, "sound": "", "mean": ""}
 
-            t = remove_brackets(elements[0].text)
+            t = clean_up(elements[0].text)
             end_keyword = "민중서림 엣센스 일한사전"
             t = t.split(end_keyword)[0]
             t_splited = t.split("\n")
 
             발음 = t_splited[0].split("[")[0].strip()
+            발음 = 발음.replace(kan,"").strip()
             #품사 = find_next_sentence(t, '단어장에 저장')
             뜻_부분 = find_next_sentence(t, '단어장에 저장', number=2)
             pattern = r'^\d+\.'
@@ -382,7 +405,7 @@ def scrape_kanji(kan):
 def tool_multi_scraper_kanji_main():
     with open("./temps/near_words_result.txt", "r", encoding="utf-8") as f:
         content = f.read().strip()
-        k = ast.literal_eval(content)  
+        k = ast.literal_eval(content)
 
     with Pool(cpu_count()) as pool:
         results = pool.map(scrape_kanji, k)
@@ -395,39 +418,33 @@ def tool_multi_scraper_kanji_main():
 
 
 
-def to_dict(lst):
-    return dict([(i+1, v) for i, v in enumerate(lst)])
+def save_data(file_path, loaded_data):
+    kanji_word = loaded_data["kanji_word"]
+    kanji_hatsuon = loaded_data["kanji_hatsuon"]
+    kanji_imi = loaded_data["kanji_imi"]
 
-def cl(s):
-    
-    s = s.strip()
-    # 양 끝의 공백 포함, 가장 바깥 괄호들 반복 제거
-    while re.match(r'^\s*[\[\{\(](.*)[\]\}\)]\s*$', s):
-        s = re.sub(r'^\s*[\[\{\(](.*)[\]\}\)]\s*$', r'\1', s)
-    s = s.strip()
+    is_jlpt_common = loaded_data["is_jlpt_common"]
+    is_daily_common = loaded_data["is_daily_common"]
 
-    # 끝에 붙은 온점, 쉼표 제거
-    while s and s[-1] in '.,':
-        s = s[:-1].rstrip()
-
-    return s
-
-def save_data(file_path, kanji_words, kanji_hatsuon, kanji_imi):
     with open(file_path, "w", encoding="utf-8") as f:
-        for idx in kanji_words :
+        for idx in kanji_word :
             item = {
-                "kan": kanji_words[idx],
+                "kan": kanji_word[idx],
                 "sound": kanji_hatsuon[idx],
-                "mean": cl(kanji_imi[idx])
+                "mean": kanji_imi[idx],
+                "is_jlpt_common": is_jlpt_common[idx],
+                "is_daily_common": is_daily_common[idx]
             }
             f.write(json.dumps(item, ensure_ascii=False) + "\n")
 
 def load_data(file_path):
-    kanji_words = []
+    kanji_word = []
     kanji_hatsuon = []
     kanji_imi = []
-    hatsuon_is_good = []
-    imi_is_good = []
+    is_hatsuon_good = []
+    is_imi_good = []
+    is_jlpt_common = []
+    is_daily_common = []
     t=open(file_path,encoding="utf-8").read().splitlines()
 
     for i in t :
@@ -436,51 +453,167 @@ def load_data(file_path):
         except json.decoder.JSONDecodeError :
             i = ast.literal_eval(i)
 
-        kanji_words.append(i["kan"])
+        kanji_word.append(i["kan"])
         kanji_hatsuon.append(i["sound"])
         kanji_imi.append(i["mean"])
-        try :
-            hatsuon_is_good.append(i["is_done_sound"])
+
+        try : is_hatsuon_good.append(i["is_done_sound"])
         except : pass
-        try :
-            imi_is_good.append(i["is_done_mean"])
+        try : is_imi_good.append(i["is_done_mean"])
+        except : pass
+        try : is_jlpt_common.append(i["is_jlpt_common"])
+        except : pass
+        try : is_daily_common.append(i["is_daily_common"])
         except : pass
 
-    kanji_words = to_dict(kanji_words)
+    kanji_word = to_dict(kanji_word)
     kanji_hatsuon = to_dict(kanji_hatsuon)
     kanji_imi = to_dict(kanji_imi)
-    hatsuon_is_good = to_dict(hatsuon_is_good)
-    imi_is_good = to_dict(imi_is_good)
+    is_hatsuon_good = to_dict(is_hatsuon_good)
+    is_imi_good = to_dict(is_imi_good)
+    is_jlpt_common = to_dict(is_jlpt_common)
+    is_daily_common = to_dict(is_daily_common)
+
+    result = {}
+    result["kanji_word"] = kanji_word
+    result["kanji_hatsuon"] = kanji_hatsuon
+    result["kanji_imi"] = kanji_imi
+    result["is_hatsuon_good"] = is_hatsuon_good
+    result["is_imi_good"] = is_imi_good
+    result["is_jlpt_common"] = is_jlpt_common
+    result["is_daily_common"] = is_daily_common
+    
+    return result
 
 
-    return kanji_words, kanji_hatsuon, kanji_imi, hatsuon_is_good, imi_is_good
 
 
+def ask_gpt(
+        question_dict, 
+        question_idx, 
+        question_subject, 
+        result_dict, 
+        need_only_number=True):
 
-def ask_gpt(question_dict: dict, question_idx: int, result_dict:dict, need_only_char:bool=True):
     global api_key
+    global GPT_MODEL
     e = None
-    for _ in range(5):
+    for _ in range(1000):
         try:
             messages = [
                 {"role": "system", "content": ""},
-                {"role": "user", "content": question_dict[question_idx]},
+                {"role": "user", "content": question_dict[question_subject][question_idx]},
             ]
             response = openai.OpenAI(api_key=api_key).chat.completions.create(
-                model="gpt-4o-mini", messages=messages, temperature=0.9
+                model=GPT_MODEL, messages=messages
+                #, temperature=0.9
             )
             answer = response.choices[0].message.content
-            if need_only_char == True :
-                #숫자도 포함되어 반환
-                answer = clean_up(answer)
-            result_dict[question_idx] = clean_up(response.choices[0].message.content)
+            
+            answer = clean_up(answer)
+            if need_only_number == True :
+                #숫자만 반환
+                answer = only_number(answer)
+
+            result_dict[question_subject][question_idx] = answer
             return
         except Exception as e:
+            custom_print(f"ask_gpt e : {e}",color="ye")
             if "429" in str(e) or "timeout" in str(e):
-                time.sleep(10)
-            return None
+                time.sleep(60)
     return None
 
+def get_tail(task_subject) :
+    if task_subject in ["hatsuon", "imi"] : 
+        return "_good"
+    elif task_subject in ["jlpt","daily"] : 
+        return "_common"
+
+
+def validate_gpt_task(loaded_data) :
+    
+    is_good = {}
+    task_dict = {}
+    threads = []
+
+    for task_subject in TASK_SUBJECT_LIST : 
+        
+        tail = get_tail(task_subject)
+        is_good[task_subject] = {}
+        task_dict[task_subject] = {}
+        
+        kanji_word_list = loaded_data[f"kanji_word"]
+
+        for idx in kanji_word_list :
+            kanji_target = loaded_data.get(f"kanji_{task_subject}",{}).get(idx,None)
+            if task_subject in GEN_TASK_SUBJECT_LIST :
+                if (not loaded_data[f"is_{task_subject}{tail}"].get(idx)) and \
+                    kanji_target : #의미가 없으면, 물어보지도 않고 곧바로 False.
+                    task_dict[task_subject][idx] = get_prompt(
+                        f"is_right_{task_subject}",
+                        [
+                            kanji_word_list[idx],
+                            kanji_target,
+                        ]
+                    )
+                elif not kanji_target :
+                    is_good[task_subject][idx] = False
+            else : 
+                task_dict[task_subject][idx] = get_prompt(f"is_right_{task_subject}",[kanji_word_list[idx]])
+
+        for task_idx in task_dict[task_subject] :
+            t = threading.Thread(target=ask_gpt, args=(
+                task_dict,
+                task_idx,
+                task_subject,
+                is_good,
+                True
+                ))
+            threads.append(t)
+            t.start()
+
+    for t in threads:
+        t.join()
+
+    gpt_task_result = {}
+    gpt_task_result["is_good"] = is_good
+    gpt_task_result["task_dict"] = task_dict
+
+
+
+    return gpt_task_result
+
+
+def generate_gpt_task(loaded_data) :
+    task_dict = {}
+    threads = []
+
+    gpt_res = {}
+    for task_subject in GEN_TASK_SUBJECT_LIST : 
+        gpt_res[task_subject] = {}
+        task_dict[task_subject] = {}
+        is_good_dict = loaded_data[f"is_{task_subject}_good"]
+        for idx in is_good_dict :
+            if not is_good_dict[idx] :
+                #if not good
+                task_dict[task_subject][idx] = get_prompt(f"ask_{task_subject}",[loaded_data["kanji_word"][idx]])
+            
+        for idx in task_dict[task_subject] :
+            t = threading.Thread(target=ask_gpt, args=(
+                task_dict,
+                idx,
+                task_subject,
+                gpt_res,
+                False
+                ))
+            threads.append(t)
+            t.start()
+        
+
+    for t in threads:
+        t.join()
+    
+    return gpt_res
 
 def only_wants(dict_data,type="num"):
     sen = ""
@@ -510,7 +643,6 @@ def is_korean(s) :
         return False
 
 if __name__ == "__main__":
-
     
     # Tkinter 기본 창 숨기기
     root = Tk()
@@ -523,10 +655,6 @@ if __name__ == "__main__":
         # 2. 결과 파일 경로 생성 (_near.txt 붙이기)
         src_path = Path(MAIN_SOURCE_FILE_PATH)
         MAIN_RESULT_FILE_PATH = src_path.with_name(src_path.stem + "_near.txt")
-
-        print("선택한 원본 파일:", MAIN_SOURCE_FILE_PATH)
-        print("결과 파일 경로:", MAIN_RESULT_FILE_PATH)
-
     else:
         print("파일 선택이 취소되었습니다.")
 
@@ -534,151 +662,43 @@ if __name__ == "__main__":
     print('MAIN_SOURCE_FILE_PATH :',MAIN_SOURCE_FILE_PATH)
     print('MAIN_MIDDLE_OUT_FILE_PATH :',MAIN_MIDDLE_OUT_FILE_PATH)
     print('MAIN_RESULT_FILE_PATH :',MAIN_RESULT_FILE_PATH)
-
-
+    #
     near_word_scraper_main_func()
     tool_multi_scraper_kanji_main()
+    #
     
-    kanji_words, kanji_hatsuon, kanji_imi, hatsuon_is_good, imi_is_good = load_data(file_path=MAIN_MIDDLE_OUT_FILE_PATH)
-
+    loaded_data = load_data(file_path=MAIN_MIDDLE_OUT_FILE_PATH)
     
-    
-    threads = []
-    checkout_hatsuon_tasks = {}
-    gpt_is_good_hatsuon = {}
-
-    for i in kanji_words :
-        if not hatsuon_is_good.get(i) and \
-            kanji_hatsuon[i] : #의미가 없으면, 물어보지도 않고 곧바로 False.
-            checkout_hatsuon_tasks[i] = get_prompt(
-                "is_right_hatsuon",
-                [
-                    kanji_words[i],
-                    kanji_hatsuon[i],
-                ]
-            )
-        elif not kanji_hatsuon[i] :
-            hatsuon_is_good[i] = False
-
-    df(checkout_hatsuon_tasks,"checkout_hatsuon_tasks")
-    for task_number in checkout_hatsuon_tasks :
-        t = threading.Thread(target=ask_gpt, args=(
-            checkout_hatsuon_tasks,
-            task_number,
-            gpt_is_good_hatsuon,
-            False
-            ))
-        threads.append(t)
-        t.start()
+    gpt_task_result = validate_gpt_task(loaded_data)
 
 
-    checkout_imi_tasks = {}
-    gpt_is_good_imi = {}
-    for i in kanji_words :
-        if not imi_is_good.get(i) and\
-            is_korean(kanji_imi[i]) : #의미가 없으면, 물어보지도 않고 곧바로 False.
-            checkout_imi_tasks[i] = get_prompt(
-                "is_right_imi",
-                [
-                    kanji_words[i],
-                    kanji_imi[i]
-                ]
-            )
-        elif not kanji_imi[i] :
-            imi_is_good[i] = False
-            
-    df(checkout_imi_tasks,"checkout_imi_tasks")
-    for task_number in checkout_imi_tasks :
-        t = threading.Thread(target=ask_gpt, args=(
-            checkout_imi_tasks,
-            task_number,
-            gpt_is_good_imi,
-            False
-            ))
-        threads.append(t)
-        t.start()
+    for task_subject in TASK_SUBJECT_LIST :
+        task_res = gpt_task_result["is_good"][task_subject]
+        for idx in task_res :
+            tail = get_tail(task_subject)
+            gpt_res = int(task_res[idx])
+            if task_subject in ["hatsuon", "imi", "daily"] :
+                if gpt_res == 0 :
+                    loaded_data[f"is_{task_subject}{tail}"][idx] = False
+                elif gpt_res == 1 :
+                    loaded_data[f"is_{task_subject}{tail}"][idx] = True
+
+            elif task_subject == "jlpt" :
+                loaded_data[f"is_{task_subject}{tail}"][idx] = gpt_res
 
 
-    for t in threads:
-        t.join()
 
-    #hatsuon_is_good = {}
-    #imi_is_good = {}
+    gpt_res = generate_gpt_task(loaded_data)
 
-    df(hatsuon_is_good,"hatsuon_is_good")
-    for i in gpt_is_good_hatsuon : 
-        try : 
-            if int(gpt_is_good_hatsuon[i]) == 0 :
-                hatsuon_is_good[i]=False
-            elif int(gpt_is_good_hatsuon[i]) == 1 :
-                hatsuon_is_good[i]=True
-        except ValueError : 
-            hatsuon_is_good[i] = False
-
-    df(imi_is_good,"imi_is_good")
-    for i in gpt_is_good_imi : 
-        try : 
-            if int(gpt_is_good_imi[i]) == 0 :
-                imi_is_good[i]=False
-            elif int(gpt_is_good_imi[i]) == 1 :
-                imi_is_good[i]=True
-        except ValueError : 
-            imi_is_good[i] = False
-
-    
-
-
-    df(hatsuon_is_good,"hatsuon_is_good")
-    df(imi_is_good,"imi_is_good")
-
-
-    generate_hatsuon_tasks = {}
-    gpt_hatsuon = {}
-    for i in hatsuon_is_good :
-        if hatsuon_is_good[i] == False:
-            generate_hatsuon_tasks[i] = get_prompt("ask_hatsuon",[kanji_words[i]])
-        
-    df(generate_hatsuon_tasks,"generate_hatsuon_tasks")
-    for task_number in generate_hatsuon_tasks :
-        t = threading.Thread(target=ask_gpt, args=(
-            generate_hatsuon_tasks,
-            task_number,
-            kanji_hatsuon
-            ))
-        threads.append(t)
-        t.start()
-        
-
-    generate_imi_tasks = {}
-    gpt_imi = {}
-    for i in imi_is_good :
-        if imi_is_good[i] == False:
-            generate_imi_tasks[i] = get_prompt("ask_imi",[kanji_words[i]])
-        
-    df(generate_imi_tasks,"generate_imi_tasks")
-    for task_number in generate_imi_tasks :
-        t = threading.Thread(target=ask_gpt, args=(
-            generate_imi_tasks,
-            task_number,
-            kanji_imi
-            ))
-        threads.append(t)
-        t.start()
-        
-
-    for t in threads:
-        t.join()
-
-        
-    for i in kanji_imi : 
-        kanji_imi[i] = cl(kanji_imi[i])
+    for res_subject in gpt_res :
+        for idx in gpt_res[res_subject] :
+            loaded_data[f"kanji_{res_subject}"][idx] = gpt_res[res_subject][idx]
 
     save_data(
         MAIN_RESULT_FILE_PATH, 
-        kanji_words, 
-        kanji_hatsuon, 
-        kanji_imi
+        loaded_data
         )
+    print("#"*88)
 
 
     

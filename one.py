@@ -1,4 +1,4 @@
-csv_file_path = "words\\230835\\230835_161_180.csv"
+csv_file_path = "words\\230835\\230835_1_60_focus2.csv"
 #Caps Lock 주의!!!
 
 #1 : 네이버 일본어 사전에서 부수 검색
@@ -29,6 +29,7 @@ csv_file_path = "words\\230835\\230835_161_180.csv"
 #Alt + c : 3번째 한자를 kanji.jitenon.jp 에 검색하고, 구성한자를 VS Code 로 열기
 
 #; : 시험종료 및 결과(를 CMD 창에)출력
+#b : 화면 청소하기
 
 import customtkinter as ctk
 import webbrowser
@@ -48,6 +49,7 @@ from tools.get_chrome_path import get_chrome_path
 
 import ast
 import unicodedata
+import time
 
 
 NEAR_INFO_FILE_PATH = ""
@@ -140,7 +142,26 @@ class NearPrinter() :
 
     def load(fpath: str):
         with open(fpath, "r", encoding="utf-8") as f:
-            return [ast.literal_eval(line) for line in f if line.strip()]
+            parsed_lines = []
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    # JSON 우선 처리
+                    parsed = json.loads(line)
+                except json.JSONDecodeError:
+                    try:
+                        # JSON 실패하면 파이썬 literal 로 처리
+                        parsed = ast.literal_eval(line)
+                    except (ValueError, SyntaxError) as e:
+                        print(f"⚠️ 파싱 실패: {line[:30]}... -> {e}")
+                        continue
+                parsed_lines.append(parsed)
+
+
+
+            return parsed_lines
 
 
     def w(txt: str) -> int:
@@ -161,36 +182,43 @@ class NearPrinter() :
         for x in r:
             kp = " " * (mk - NearPrinter.w(x["kan"]) + sp)
             spd = " " * (ms - NearPrinter.w(x["sound"]) + sp)
-            out[x["kan"]] = f"{x['kan']}{kp}{x['sound']}{spd}{x['mean'][:NearPrinter.limit]}"
+            out[x["kan"]] = {}
+            out[x["kan"]]["sentence"] = f"{x['kan']}{kp}{x['sound']}{spd}{x['mean'][:NearPrinter.limit]}"
+            out[x["kan"]]["is_jlpt_common"] = x["is_jlpt_common"]
+            out[x["kan"]]["is_daily_common"] = x["is_daily_common"]
         return out
 
     def print_link(text_data, kan, base="https://ja.dict.naver.com/#/search?query="):
-        print(f"{kan}\033]8;;{base}{kan}\033\\{str(text_data[kan]).replace(kan,'')}\033]8;;\033\\")
+        if text_data : 
+            header = f"{kan}"
+            footer = ""
+            is_jlpt_common = text_data[kan].get("is_jlpt_common",None)
+            if not is_jlpt_common == None :
+                if int(is_jlpt_common) == 1:
+                    #별로 안중요한거
+                    header = f"🔵 {header}"
+                elif int(is_jlpt_common) == 2:
+                    #외우면 좋은거
+                    header = f"🟠 {header}"
+                elif int(is_jlpt_common) == 3:
+                    #반드시 외워야하는거
+                    header = f"🔴 {header}"
 
-    def sort_search_result(search_result, search_word, word_idx):
-        words = list(search_result.keys())
 
-        def first_occurrence(word):
-            try:
-                return word.index(search_word)
-            except ValueError:
-                return float('inf') 
+            is_daily_common = text_data[kan].get("is_daily_common",None)
+            if not is_daily_common == None :
+                if is_daily_common == True:
+                    #일상에서 쓰이는거
+                    footer = f"{footer} O"#✅
+                else :
+                    #일상에서 안쓰이는거
+                    footer = f"{footer}"#❌
 
-        sorted_keys = sorted(words, key=first_occurrence)
 
-        groups = {}
-        for w in sorted_keys:
-            idx = first_occurrence(w)
-            if idx not in groups:
-                groups[idx] = []
-            groups[idx].append(w)
 
-        if word_idx in groups:
-            final_keys = groups[word_idx] + [w for k in sorted(groups.keys()) if k != word_idx for w in groups[k]]
-        else:
-            final_keys = sorted_keys 
+            link_part = f"\033]8;;{base}{kan}\033\\{str(text_data[kan]["sentence"]).replace(kan,'')}\033]8;;\033\\"
 
-        return {k: search_result[k] for k in final_keys}
+            print(f"{header}{link_part}{footer}")
 
     def sort_search_result(search_result, search_word, word_idx, word_len=None):
         """
@@ -200,6 +228,7 @@ class NearPrinter() :
         word_len: int or None, 그룹 내에서 우선 출력할 단어 길이
         """
         words = list(search_result.keys())
+        
 
         # 1️⃣ 단어별 search_word 등장 인덱스 계산
         def first_occurrence(word):
@@ -244,7 +273,16 @@ class NearPrinter() :
             final_keys = ordered_keys
 
         # 6️⃣ 딕셔너리 재생성
-        return {k: search_result[k] for k in final_keys}
+
+        
+        ordered_dict = {}
+        for k in final_keys:
+            ordered_dict[k] = {}
+            ordered_dict[k]["sentence"] = search_result[k]["sentence"]
+            ordered_dict[k]["is_jlpt_common"] = search_result[k]["is_jlpt_common"]
+            ordered_dict[k]["is_daily_common"] = search_result[k]["is_daily_common"]
+
+        return ordered_dict
 
 
 
@@ -255,12 +293,18 @@ class NearPrinter() :
 
         
         near_data = NearPrinter.load(NEAR_INFO_FILE_PATH)
+
+        filtered_list = []
+        for x in near_data:
+            if search_kan in x["kan"]:
+                filtered_list.append(x)
+        # 2. setup_link_print() 함수 호출
         search_result = NearPrinter.setup_link_print(
-                [x for x in near_data if search_kan in x["kan"]], 
-                NearPrinter.space
-            )
+            filtered_list,       # 필터링된 단어 리스트
+            NearPrinter.space    # 출력용 간격
+        )
         
-        sorted_search_result = NearPrinter.sort_search_result(search_result, search_kan, word_idx,word_len)
+        sorted_search_result = NearPrinter.sort_search_result(search_result, search_kan, word_idx, word_len)
 
         for line in sorted_search_result:
             NearPrinter.print_link(sorted_search_result, line)
@@ -318,6 +362,8 @@ class FlashcardApp(ctk.CTk):
 
         #self.focus_set()
 
+        self.now_timestamp = time.time()
+
     
     def rebind_keys(self):
         
@@ -372,6 +418,9 @@ class FlashcardApp(ctk.CTk):
         
 
         self.bind(f"<Control-{3}>", lambda event, w=3: self.search(target=5,word=w)) #소문자 입력 감지
+
+        
+        self.bind("b", lambda event: self.cmd_cleanup())
         
 
 
@@ -446,6 +495,7 @@ class FlashcardApp(ctk.CTk):
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
         }
         print("detail_url :",detail_url)
+        
         res = requests.get(detail_url, headers=headers)
         res.raise_for_status()
         soup = BeautifulSoup(res.text, "html.parser")
@@ -672,6 +722,13 @@ class FlashcardApp(ctk.CTk):
 
     # 다음 카드로 이동
     def next_card(self,selected_end=False):
+        self.now_timestamp
+        if time.time() - self.now_timestamp < 1 :
+            #1초 안에 다음 카드로 넘기면.
+            print("🟢")
+        else : 
+            print("🔴")
+
         # 현재 카드를 방문 처리
         self.visited[self.current_index] = True
         self.viewed_index_list.append(self.current_index)
@@ -689,9 +746,10 @@ class FlashcardApp(ctk.CTk):
             if not self.remaining_data:
                 sys.exit()
             else:
-                print("시험을 다시 시작합니다.")
                 print("*"*88)
-                print(self.remaining_data)
+                for i in self.remaining_data :
+                    writer = csv.writer(sys.stdout)
+                    writer.writerow([i["k"], i["km"], f'{i["s"]}/{i["m"]}', i["p"]])
                 print("*"*88)
                 self.restart_with_knows_zero()
 
@@ -712,7 +770,10 @@ class FlashcardApp(ctk.CTk):
         url = f"https://ja.dict.naver.com/#/search?query={self.p_label.cget("text")}"
         webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(get_chrome_path()))
         webbrowser.get('chrome').open(url)
-        
+    
+    def cmd_cleanup(self) :
+        os.system('cls')
+
     def search(self, target=None, word=None, event=None):
 
         #target 은 숫자, word 는 (들어온다면) 한자 정보 인입
