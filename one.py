@@ -1,4 +1,4 @@
-csv_file_path = "words\\230835\\230835_1_60_focus2.csv"
+csv_file_path = "words\\0temptable.csv"
 #Caps Lock 주의!!!
 
 #1 : 네이버 일본어 사전에서 부수 검색
@@ -56,6 +56,46 @@ NEAR_INFO_FILE_PATH = ""
 try : 
     NEAR_INFO_FILE_PATH = f"{csv_file_path.split(".")[0]}_near.txt"
 except : pass
+
+
+EMOJI_SETUP = {
+    "is_jlpt_common" : {
+        1:"🔵",#별로 안중요한거
+        2:"🟠",#외우면 좋은거
+        3:"🔴",#반드시 외워야하는거
+    },
+    "is_daily_common" : {
+        True:"✅",#일상에서 쓰이는거
+        False:"❌",#일상에서 안쓰이는거
+    },
+    "passable_speed" : {
+        True:"🟢",
+        False:"🔴",
+    }
+}
+
+
+EMOJI_SETUP = {
+    "is_jlpt_common" : {
+        1:"-",#별로 안중요한거
+        2:"△",#외우면 좋은거
+        3:"O",#반드시 외워야하는거
+    },
+    "is_daily_common" : {
+        True:"O",#일상에서 쓰이는거
+        False:"",#일상에서 안쓰이는거
+    },
+    "passable_speed" : {
+        True:"🟢",
+        False:"🔴",
+    }
+}
+
+BUTTON_PRESS_HANDICAP = 0.2
+PASSABLE_TIME_LIMIT = 2
+
+
+
 
 
 font_size = 15#32,64
@@ -141,27 +181,31 @@ class NearPrinter() :
     limit = 10
 
     def load(fpath: str):
-        with open(fpath, "r", encoding="utf-8") as f:
-            parsed_lines = []
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    # JSON 우선 처리
-                    parsed = json.loads(line)
-                except json.JSONDecodeError:
-                    try:
-                        # JSON 실패하면 파이썬 literal 로 처리
-                        parsed = ast.literal_eval(line)
-                    except (ValueError, SyntaxError) as e:
-                        print(f"⚠️ 파싱 실패: {line[:30]}... -> {e}")
+        try : 
+            with open(fpath, "r", encoding="utf-8") as f:
+                parsed_lines = []
+                for line in f:
+                    line = line.strip()
+                    if not line:
                         continue
-                parsed_lines.append(parsed)
+                    try:
+                        # JSON 우선 처리
+                        parsed = json.loads(line)
+                    except json.JSONDecodeError:
+                        try:
+                            # JSON 실패하면 파이썬 literal 로 처리
+                            parsed = ast.literal_eval(line)
+                        except (ValueError, SyntaxError) as e:
+                            print(f"⚠️ 파싱 실패: {line[:30]}... -> {e}")
+                            continue
+                    parsed_lines.append(parsed)
 
 
 
-            return parsed_lines
+                return parsed_lines
+        except : 
+            return []
+
 
 
     def w(txt: str) -> int:
@@ -184,8 +228,8 @@ class NearPrinter() :
             spd = " " * (ms - NearPrinter.w(x["sound"]) + sp)
             out[x["kan"]] = {}
             out[x["kan"]]["sentence"] = f"{x['kan']}{kp}{x['sound']}{spd}{x['mean'][:NearPrinter.limit]}"
-            out[x["kan"]]["is_jlpt_common"] = x["is_jlpt_common"]
-            out[x["kan"]]["is_daily_common"] = x["is_daily_common"]
+            out[x["kan"]]["is_jlpt_common"] = x.get("is_jlpt_common",None)
+            out[x["kan"]]["is_daily_common"] = x.get("is_daily_common",None)
         return out
 
     def print_link(text_data, kan, base="https://ja.dict.naver.com/#/search?query="):
@@ -194,31 +238,24 @@ class NearPrinter() :
             footer = ""
             is_jlpt_common = text_data[kan].get("is_jlpt_common",None)
             if not is_jlpt_common == None :
-                if int(is_jlpt_common) == 1:
-                    #별로 안중요한거
-                    header = f"🔵 {header}"
-                elif int(is_jlpt_common) == 2:
-                    #외우면 좋은거
-                    header = f"🟠 {header}"
-                elif int(is_jlpt_common) == 3:
-                    #반드시 외워야하는거
-                    header = f"🔴 {header}"
-
+                if str(is_jlpt_common).isdigit() :
+                    header = f"{EMOJI_SETUP["is_jlpt_common"][int(is_jlpt_common)]} {header}"
 
             is_daily_common = text_data[kan].get("is_daily_common",None)
             if not is_daily_common == None :
                 if is_daily_common == True:
                     #일상에서 쓰이는거
-                    footer = f"{footer} O"#✅
+                    footer = f"{footer} {EMOJI_SETUP["is_daily_common"][is_daily_common]}"#✅
                 else :
                     #일상에서 안쓰이는거
-                    footer = f"{footer}"#❌
+                    footer = f"{footer} {EMOJI_SETUP["is_daily_common"][is_daily_common]}"#❌
 
 
 
             link_part = f"\033]8;;{base}{kan}\033\\{str(text_data[kan]["sentence"]).replace(kan,'')}\033]8;;\033\\"
 
             print(f"{header}{link_part}{footer}")
+            
 
     def sort_search_result(search_result, search_word, word_idx, word_len=None):
         """
@@ -293,6 +330,10 @@ class NearPrinter() :
 
         
         near_data = NearPrinter.load(NEAR_INFO_FILE_PATH)
+        if not near_data : 
+            print("No Near File")
+            return 
+
 
         filtered_list = []
         for x in near_data:
@@ -308,6 +349,7 @@ class NearPrinter() :
 
         for line in sorted_search_result:
             NearPrinter.print_link(sorted_search_result, line)
+        print("_"*3)
 
 
 
@@ -722,12 +764,10 @@ class FlashcardApp(ctk.CTk):
 
     # 다음 카드로 이동
     def next_card(self,selected_end=False):
-        self.now_timestamp
-        if time.time() - self.now_timestamp < 1 :
-            #1초 안에 다음 카드로 넘기면.
-            print("🟢")
-        else : 
-            print("🔴")
+        
+        used_time = (time.time() - self.now_timestamp) - BUTTON_PRESS_HANDICAP
+        print(f"{EMOJI_SETUP["passable_speed"][used_time < PASSABLE_TIME_LIMIT]} {str(used_time)[:3]} {self.word_label.cget('text')}")
+        self.now_timestamp = time.time()
 
         # 현재 카드를 방문 처리
         self.visited[self.current_index] = True
@@ -871,7 +911,7 @@ class FlashcardApp(ctk.CTk):
 
     def restart_with_knows_zero(self, event=None) :
 
-        print("다음 시험을 시작합니다: knows가 0인 카드만 포함")
+        #print("다음 시험을 시작합니다: knows가 0인 카드만 포함")
         self.current_index = 0
         
         self.visited = [False] * len(self.remaining_data)
@@ -898,4 +938,8 @@ class FlashcardApp(ctk.CTk):
 if __name__ == "__main__":
     app = FlashcardApp()
     app.mainloop()
+
+
+
+
 
