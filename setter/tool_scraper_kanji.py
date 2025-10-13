@@ -172,8 +172,10 @@ for kan in k :
                     t["s"] += lines[i + 1]  # 음독 다음 줄을 "s"에 추가
                 elif line == "훈독" and i + 1 < len(lines):
                     t["m"] += lines[i + 1]  # 훈독 다음 줄을 "m"에 추가
+                '''
                 elif line == "부수" and i + 1 < len(lines):
                     t["p"] += lines[i + 1]  # 훈독 다음 줄을 "m"에 추가
+                '''
                     
             print("ghdwpaks"*3,t)
             l.append(t)
