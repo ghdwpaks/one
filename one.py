@@ -1,4 +1,4 @@
-csv_file_path = "words\\0temptable.csv"
+csv_file_path = "words\\mext\\2_grade.csv"
 #Caps Lock 주의!!!
 
 #1 : 네이버 일본어 사전에서 부수 검색
@@ -53,6 +53,7 @@ import unicodedata
 import time
 
 
+
 NEAR_INFO_FILE_PATH = ""
 try : 
     NEAR_INFO_FILE_PATH = f"{csv_file_path.split('.')[0]}_near.txt"
@@ -96,7 +97,9 @@ BUTTON_PRESS_HANDICAP = 0.2
 PASSABLE_TIME_LIMIT = 2
 
 
-
+default_font = "맑은 고딕"
+default_font = "나눔고딕코딩"
+default_font = "D2Coding"
 
 
 font_size = 15#32,64
@@ -176,7 +179,7 @@ for row in test_data:
         row['knows'] = 0
 
 
-class NearPrinter() :
+class WordNearPrinter() :
 
     space = 1
     limit = 10
@@ -221,14 +224,14 @@ class NearPrinter() :
     def setup_link_print(r: list[dict], sp: int):
         if not r:
             return []
-        mk = max(NearPrinter.w(x["kan"]) for x in r)
-        ms = max(NearPrinter.w(x["sound"]) for x in r)
+        mk = max(WordNearPrinter.w(x["kan"]) for x in r)
+        ms = max(WordNearPrinter.w(x["sound"]) for x in r)
         out = {}
         for x in r:
-            kp = " " * (mk - NearPrinter.w(x["kan"]) + sp)
-            spd = " " * (ms - NearPrinter.w(x["sound"]) + sp)
+            kp = " " * (mk - WordNearPrinter.w(x["kan"]) + sp)
+            spd = " " * (ms - WordNearPrinter.w(x["sound"]) + sp)
             out[x["kan"]] = {}
-            out[x["kan"]]["sentence"] = f"{x['kan']}{kp}{x['sound']}{spd}{x['mean'][:NearPrinter.limit]}"
+            out[x["kan"]]["sentence"] = f"{x['kan']}{kp}{x['sound']}{spd}{x['mean'][:WordNearPrinter.limit]}"
             out[x["kan"]]["is_jlpt_common"] = x.get("is_jlpt_common",None)
             out[x["kan"]]["is_daily_common"] = x.get("is_daily_common",None)
         return out
@@ -330,7 +333,7 @@ class NearPrinter() :
             return
 
         
-        near_data = NearPrinter.load(NEAR_INFO_FILE_PATH)
+        near_data = WordNearPrinter.load(NEAR_INFO_FILE_PATH)
         if not near_data : 
             print("No Near File")
             return 
@@ -341,17 +344,58 @@ class NearPrinter() :
             if search_kan in x["kan"]:
                 filtered_list.append(x)
         # 2. setup_link_print() 함수 호출
-        search_result = NearPrinter.setup_link_print(
+        search_result = WordNearPrinter.setup_link_print(
             filtered_list,       # 필터링된 단어 리스트
-            NearPrinter.space    # 출력용 간격
+            WordNearPrinter.space    # 출력용 간격
         )
         
-        sorted_search_result = NearPrinter.sort_search_result(search_result, search_kan, word_idx, word_len)
+        sorted_search_result = WordNearPrinter.sort_search_result(search_result, search_kan, word_idx, word_len)
 
         for line in sorted_search_result:
-            NearPrinter.print_link(sorted_search_result, line)
+            WordNearPrinter.print_link(sorted_search_result, line)
         print("_"*3)
 
+
+class KanNearPrinter() :
+    
+    space = 1
+    limit = 10
+    def near_printer_main(self_data):
+        if not self_data.near_kan_data : 
+            if not NEAR_INFO_FILE_PATH : 
+                print("disabled near service.")
+                return
+            try : 
+                text = ""
+                with open(NEAR_INFO_FILE_PATH, "r", encoding="utf-8") as f:
+                    text = f.read().strip()
+
+                data = json.loads(text)
+                self_data.near_kan_data = data
+            except :
+                print("disabled near service.")
+                return
+
+    
+    
+    def setup_print(r: list[dict], sp: int):
+        if not r:
+            return ""
+        mk = max(WordNearPrinter.w(x[0]) for x in r)
+        ms = max(WordNearPrinter.w(x[1]) for x in r)
+
+        out = ""
+        for x in r:
+            #kp = "\t" * (mk - WordNearPrinter.w(x[0]) + sp)
+            #spd = "\t" * (ms - WordNearPrinter.w(x[1]) + sp)
+            kp = "\t"
+            spd = "\t"
+            out = f"{out}{x[0]}{kp}{x[1]}{spd}{x[2]}"
+
+            out = f"{out}\n"
+        
+        
+        return out
 
 
 
@@ -407,6 +451,9 @@ class FlashcardApp(ctk.CTk):
 
         self.now_timestamp = time.time()
         self.stamped_already = False
+
+        self.near_kan_data = None
+
 
     
     def rebind_keys(self):
@@ -539,7 +586,6 @@ class FlashcardApp(ctk.CTk):
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
         }
-        print("detail_url :",detail_url)
         
         res = requests.get(detail_url, headers=headers)
         res.raise_for_status()
@@ -599,14 +645,14 @@ class FlashcardApp(ctk.CTk):
     def show_initial_screen(self):
         """시험 설정 화면 표시"""
         # 설명 텍스트
-        self.title_label = ctk.CTkLabel(self, text="시험 설정", font=("맑은 고딕", 20))
+        self.title_label = ctk.CTkLabel(self, text="시험 설정", font=(default_font, 20))
         self.title_label.pack(pady=10)
 
-        self.info_label = ctk.CTkLabel(self, text=f"총 단어 수: {len(self.remaining_data)}", font=("맑은 고딕", 14))
+        self.info_label = ctk.CTkLabel(self, text=f"총 단어 수: {len(self.remaining_data)}", font=(default_font, 14))
         self.info_label.pack()
 
         # 등분 설정
-        self.num_parts_label = ctk.CTkLabel(self, text=f"등분: {self.num_parts}", font=("맑은 고딕", 14))
+        self.num_parts_label = ctk.CTkLabel(self, text=f"등분: {self.num_parts}", font=(default_font, 14))
         self.num_parts_label.pack(pady=5)
 
         self.num_parts_minus = ctk.CTkButton(self, text="-", command=lambda: self.update_num_parts(-1), width=50)
@@ -616,7 +662,7 @@ class FlashcardApp(ctk.CTk):
         self.num_parts_plus.pack(side="left", padx=5)
 
         # 파트 선택
-        self.current_part_label = ctk.CTkLabel(self, text=f"파트: {self.current_part}", font=("맑은 고딕", 14))
+        self.current_part_label = ctk.CTkLabel(self, text=f"파트: {self.current_part}", font=(default_font, 14))
         self.current_part_label.pack(pady=5)
 
         self.current_part_minus = ctk.CTkButton(self, text="-", command=lambda: self.update_current_part(-1), width=50)
@@ -732,10 +778,35 @@ class FlashcardApp(ctk.CTk):
     # 뜻 화면 업데이트
     def update_meaning_screen(self):
         data = self.remaining_data[self.current_index]
+        print('data :',data)
         self.p_label.configure(text=f"{data['p']}")#부수 및 획수: 
         self.s_label.configure(text=f"{data['s']}")#음독: 
-        self.m_label.configure(text=f"{data['m']}")#훈독: 
-        self.km_label.configure(text=f"{data['km']}")#한국어 뜻: 
+        
+        if len(data['k']) < 2 and "·" in data['m'] : 
+            data_m = []
+            data_m_list = data['m'].split("·")
+            for kun in data_m_list :
+                if not self.near_kan_data : KanNearPrinter.near_printer_main(self_data=self)
+                data_m.append([kun,self.near_kan_data['kun'][data['k']][kun],self.near_kan_data['imi'][data['k']][kun]])
+
+            data_m = KanNearPrinter.setup_print(
+                data_m,
+                KanNearPrinter.space
+                )
+            
+            
+            
+            self.km_label.configure(anchor="w")#왼쪽 정렬
+            self.km_label.configure(justify="left")#왼쪽 정렬
+            
+            self.km_label.configure(text=f"{data_m}")#훈독과 한국어 뜻
+
+
+
+        else : 
+            self.m_label.configure(text=f"{data['m']}")#훈독: 
+            self.km_label.configure(text=f"{data['km']}")#한국어 뜻: 
+            self.km_label.configure(anchor="center")#가운데 정렬
 
     # 단어 화면 업데이트    
     def update_word_screen(self):
@@ -843,7 +914,7 @@ class FlashcardApp(ctk.CTk):
                 word_idx = self.search_keys.index(word)
                 target_word = self.word_label.cget("text")
                 target_kan = target_word[word_idx]
-                NearPrinter.near_printer_main(target_kan,word_idx,len(target_word))
+                WordNearPrinter.near_printer_main(target_kan,word_idx,len(target_word))
                 #pyperclip.copy(f"{target}가 어떤 부속 한자로 이루어져있는지 알려줘. 부속 한자의 뜻, 역할, 암시, 그리고 이 부속한자들의 전체적인 의미에 대해서 알려줘.")
             elif target == 4 : 
                 target = self.word_label.cget("text")[self.search_keys.index(word)]
