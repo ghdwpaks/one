@@ -30,6 +30,7 @@ csv_file_path = "words\\0temptable.csv"
 
 #; : 시험종료 및 결과(를 CMD 창에)출력
 #b : 화면 청소하기
+#s : 현재 단어의 소요시간 출력 및 카운트 멈추기. (내심으로 확정지은다음에, 실제로 그러한지 확인하기 위한 조작키)
 
 import customtkinter as ctk
 import webbrowser
@@ -54,7 +55,7 @@ import time
 
 NEAR_INFO_FILE_PATH = ""
 try : 
-    NEAR_INFO_FILE_PATH = f"{csv_file_path.split(".")[0]}_near.txt"
+    NEAR_INFO_FILE_PATH = f"{csv_file_path.split('.')[0]}_near.txt"
 except : pass
 
 
@@ -86,8 +87,8 @@ EMOJI_SETUP = {
         False:"",#일상에서 안쓰이는거
     },
     "passable_speed" : {
-        True:"🟢",
-        False:"🔴",
+        True:"O",
+        False:"X",
     }
 }
 
@@ -239,20 +240,20 @@ class NearPrinter() :
             is_jlpt_common = text_data[kan].get("is_jlpt_common",None)
             if not is_jlpt_common == None :
                 if str(is_jlpt_common).isdigit() :
-                    header = f"{EMOJI_SETUP["is_jlpt_common"][int(is_jlpt_common)]} {header}"
+                    header = f"{EMOJI_SETUP['is_jlpt_common'][int(is_jlpt_common)]} {header}"
 
             is_daily_common = text_data[kan].get("is_daily_common",None)
             if not is_daily_common == None :
                 if is_daily_common == True:
                     #일상에서 쓰이는거
-                    footer = f"{footer} {EMOJI_SETUP["is_daily_common"][is_daily_common]}"#✅
+                    footer = f"{footer} {EMOJI_SETUP['is_daily_common'][is_daily_common]}"#✅
                 else :
                     #일상에서 안쓰이는거
-                    footer = f"{footer} {EMOJI_SETUP["is_daily_common"][is_daily_common]}"#❌
+                    footer = f"{footer} {EMOJI_SETUP['is_daily_common'][is_daily_common]}"#❌
 
 
 
-            link_part = f"\033]8;;{base}{kan}\033\\{str(text_data[kan]["sentence"]).replace(kan,'')}\033]8;;\033\\"
+            link_part = f"\033]8;;{base}{kan}\033\\{str(text_data[kan]['sentence']).replace(kan,'')}\033]8;;\033\\"
 
             print(f"{header}{link_part}{footer}")
             
@@ -405,6 +406,7 @@ class FlashcardApp(ctk.CTk):
         #self.focus_set()
 
         self.now_timestamp = time.time()
+        self.stamped_already = False
 
     
     def rebind_keys(self):
@@ -463,6 +465,7 @@ class FlashcardApp(ctk.CTk):
 
         
         self.bind("b", lambda event: self.cmd_cleanup())
+        self.bind("s", lambda event: self.time_stamp())
         
 
 
@@ -571,7 +574,7 @@ class FlashcardApp(ctk.CTk):
         for a in soup.find_all("a"):
             class_list = a.get("class", [])
             if "ajax" in class_list and "color1" in class_list:
-                return_url = f"{a.get("href")}#m_kousei"
+                return_url = f"{a.get('href')}#m_kousei"
                 #webbrowser.open(return_url)
                 return return_url
             
@@ -579,7 +582,7 @@ class FlashcardApp(ctk.CTk):
         for a in soup.find_all("a"):
             class_list = a.get("class", [])
             if "ajax" in class_list :
-                return_url = f"{a.get("href")}#m_kousei"
+                return_url = f"{a.get('href')}#m_kousei"
                 #webbrowser.open(return_url)
                 return return_url
             
@@ -765,8 +768,11 @@ class FlashcardApp(ctk.CTk):
     # 다음 카드로 이동
     def next_card(self,selected_end=False):
         
-        used_time = (time.time() - self.now_timestamp) - BUTTON_PRESS_HANDICAP
-        print(f"{EMOJI_SETUP["passable_speed"][used_time < PASSABLE_TIME_LIMIT]} {str(used_time)[:3]} {self.word_label.cget('text')}")
+        if self.stamped_already == False : 
+            used_time = (time.time() - self.now_timestamp) - BUTTON_PRESS_HANDICAP
+            print(f"{EMOJI_SETUP['passable_speed'][used_time < PASSABLE_TIME_LIMIT]} {str(used_time)[:3]} {self.word_label.cget('text')}")
+
+        self.stamped_already = False
         self.now_timestamp = time.time()
 
         # 현재 카드를 방문 처리
@@ -807,10 +813,17 @@ class FlashcardApp(ctk.CTk):
 
 
     def search_radical(self, event=None):
-        url = f"https://ja.dict.naver.com/#/search?query={self.p_label.cget("text")}"
+        url = f"https://ja.dict.naver.com/#/search?query={self.p_label.cget('text')}"
         webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(get_chrome_path()))
         webbrowser.get('chrome').open(url)
     
+    def time_stamp(self) :
+        if self.stamped_already == False : 
+            used_time = (time.time() - self.now_timestamp) - BUTTON_PRESS_HANDICAP
+            print(f"{EMOJI_SETUP['passable_speed'][used_time < PASSABLE_TIME_LIMIT]} {str(used_time)[:3]} {self.word_label.cget('text')}")
+            self.stamped_already = True
+
+        
     def cmd_cleanup(self) :
         os.system('cls')
 
