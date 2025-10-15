@@ -7,13 +7,56 @@ import re
 
 import threading
 import random; 
+import msvcrt
 
+import ctypes
+import sys
 
 api_key = os.getenv("OPENAI_API_KEY")
 if not api_key:
     raise RuntimeError("OPENAI_API_KEY 환경변수가 없습니다.")
 
 client = openai.OpenAI(api_key=api_key)
+
+
+def hide_cursor():
+    """Windows 콘솔 커서 숨기기"""
+    class CONSOLE_CURSOR_INFO(ctypes.Structure):
+        _fields_ = [("dwSize", ctypes.c_int),
+                    ("bVisible", ctypes.c_bool)]
+
+    handle = ctypes.windll.kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
+    cursor_info = CONSOLE_CURSOR_INFO()
+    ctypes.windll.kernel32.GetConsoleCursorInfo(handle, ctypes.byref(cursor_info))
+    cursor_info.bVisible = False
+    ctypes.windll.kernel32.SetConsoleCursorInfo(handle, ctypes.byref(cursor_info))
+
+def show_cursor():
+    """Windows 콘솔 커서 복원"""
+    class CONSOLE_CURSOR_INFO(ctypes.Structure):
+        _fields_ = [("dwSize", ctypes.c_int),
+                    ("bVisible", ctypes.c_bool)]
+
+    handle = ctypes.windll.kernel32.GetStdHandle(-11)
+    cursor_info = CONSOLE_CURSOR_INFO()
+    ctypes.windll.kernel32.GetConsoleCursorInfo(handle, ctypes.byref(cursor_info))
+    cursor_info.bVisible = True
+    ctypes.windll.kernel32.SetConsoleCursorInfo(handle, ctypes.byref(cursor_info))
+
+def wait_key_no_cursor(prompt=""):
+    """CMD에서 커서 깜빡임 없이 엔터 대기"""
+    sys.stdout.write(prompt)
+    sys.stdout.flush()
+    hide_cursor()
+    try:
+        while True:
+            ch = msvcrt.getch()
+            if ch in (b'\r', b'\n'):  # Enter 입력 시 종료
+                break
+    finally:
+        show_cursor()
+        print("", end="", flush=True)
+
 
 def clean_up(s: str) -> str :
     try : 
@@ -29,8 +72,8 @@ def clean_up(s: str) -> str :
 
 def speak_japanese(text: str, slow: bool = False):
     if not text.strip():
-        raise ValueError("입력된 문장이 없습니다.")
-
+        print("[speak_japanese]:입력된 문장이 없습니다.")
+        return 
     # 임시 mp3 파일 생성
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
         tts = gTTS(text=text, lang="ja", slow=slow)
@@ -109,11 +152,42 @@ def target_getter(target) :
 
     if isinstance(target,str) :
         speak_japanese(target)
-        input()
+        wait_key_no_cursor()
     elif isinstance(target,list) :
         for cell in target :
             speak_japanese(cell)
-            input()
+            wait_key_no_cursor()
+
+td = {
+    "kun":{
+        "早": {"はやい": "早い","はやまる": "早まる","はやめる": "早める"},
+        "天": {"あま": "天","あめ": "天"},
+        "入": {"いる": "入る","いれる": "入れる","はいる": "入る"},
+        "木": {"き": "木","こ": "木"},
+        "目": {"め": "目","ま": "目"},
+        "下": {"おりる": "下りる","おろす": "下ろす","くださる": "下さる","くだす": "下す","くだる": "下る","さがる": "下がる","さげる": "下げる","した": "下","しも": "下","もと": "下"},
+        "空": {"あく": "空く","あける": "空ける","から": "空","そら": "空"},
+        "上": {"あがる": "上がる","あげる": "上げる","うえ": "上","うわ": "上","かみ": "上","のぼる": "上る","のぼす": "上す","のぼせる": "上せる"},
+        "正": {"ただしい": "正しい","ただす": "正す","まさ": "正"},
+        "生": {"いかす": "生かす","いきる": "生きる","いける": "生ける","うまれる": "生まれる","うむ": "生む","なま": "生","はえる": "生える","はやす": "生やす","おう": "生う","き": "生"},
+        "青": {"あお": "青","あおい": "青い"},
+        "赤": {"あか": "赤","あかい": "赤い","あからむ": "赤らむ","あからめる": "赤らめる"}
+    },
+    "imi": {
+        "早": {"はやい": "빠르다","はやまる": "성급해지다","はやめる": "앞당기다"},
+        "天": {"あま": "하늘","あめ": "비"},
+        "入": {"いる": "들어가다","いれる": "넣다","はいる": "들다"},
+        "木": {"き": "나무","こ": "N"},
+        "目": {"め": "눈","ま": "N"},
+        "下": {"おりる": "내려오다","おろす": "내리다","くださる": "주시다","くだす": "내리다","くだる": "내려가다","さがる": "내려가다","さげる": "내리다","した": "아래","しも": "아래","もと": "밑"},
+        "空": {"あく": "비다","あける": "비우다","から": "비어 있다","そら": "하늘"},
+        "上": {"あがる": "오르다","あげる": "올리다","うえ": "위","うわ": "위","かみ": "위","のぼる": "올라가다","のぼす": "올리다","のぼせる": "올리다"},
+        "正": {"ただしい": "옳다","ただす": "바로잡다","まさ": "바름·정직"},
+        "生": {"いかす": "살리다","いきる": "살다","いける": "살다","うまれる": "태어나다","うむ": "낳다","なま": "생","はえる": "나다","はやす": "기르다","おう": "N","き": "살아 있는 것"},
+        "青": {"あお": "푸르다","あおい": "푸르다"},
+        "赤": {"あか": "붉다","あかい": "붉다","あからむ": "붉어지다","あからめる": "붉히다"}
+    }
+}
 
 t = [
 ["千",'せん','ち','천'],
@@ -140,22 +214,17 @@ t = [
 ]
 
 
-
-
-
-
-
-
-
-
-
-
-
 random.shuffle(t)
 
 t_len = 4
+
+
+
+
+'''
 #한자보이기
 for i in t : 
+    dont_need_imi = False
     for j in range(t_len) :
         print_target_list = i[j].split("·")
 
@@ -164,9 +233,25 @@ for i in t :
             header = "-"
 
         for k in print_target_list : 
-            print(f"{header}{k}")
-            input()
-    print("\n\n")
+            if header :
+                if len(print_target_list) > 1 : 
+                    print(f"{header}{k}")
+                    speak_japanese(k)
+                    wait_key_no_cursor()
+                    print(f"{td["imi"][i[0]][k]}")
+                    print()
+                    dont_need_imi = True
+                else : 
+                    print(f"{header}{k}")
+                    speak_japanese(k)
+                
+            else :
+                if dont_need_imi and j == 3 :
+                    pass
+                else : 
+                    print(f"{k}")
+            wait_key_no_cursor()
+    print("\n\n\n\n")
 
 '''
 
@@ -177,20 +262,22 @@ for i in t :
     if "·" in target :
         target = target.split("·")
         
-    print(target)
     if not any('\u3040' <= c <= '\u30ff' or '\u4e00' <= c <= '\u9faf' for c in target): 
         continue
 
 
     if isinstance(target,str) :
+        print(target)
         speak_japanese(target)
-        input()
+        wait_key_no_cursor()
     elif isinstance(target,list) :
         for cell in target :
+            print(cell)
             speak_japanese(cell)
-            input()
+            wait_key_no_cursor()
 
-'''
+    print("\n\n")
+
 
 
 '''
@@ -207,23 +294,23 @@ for i in range(len(t)) :
         print(td_cell["w"])
         print(td_cell["ws"])
         speak_japanese(td_cell["w"])
-        input()
+        wait_key_no_cursor()
         print(td_cell["m"])
-        input()
+        wait_key_no_cursor()
         print(td_cell["s"])
         print(td_cell["ss"])
         speak_japanese(td_cell["s"])
-        input()
+        wait_key_no_cursor()
         print(td_cell["sm"])
-        input()
+        wait_key_no_cursor()
 
-    input()
+    wait_key_no_cursor()
 
     target_getter(t[i][1])
     target_getter(t[i][2])
 
-
 '''
+
         
 
 
@@ -236,10 +323,10 @@ for i in range(len(t)) :
     td_l = td[target]["e"]
     for td_cell in td_l :
         print(td_cell["w"])
-        if input() == "1" : print(f'{td_cell["ws"]}\n{td_cell["m"]}')
+        if wait_key_no_cursor() == "1" : print(f'{td_cell["ws"]}\n{td_cell["m"]}')
         print()
         print(td_cell["s"])
-        if input() == "1" : print(f'{td_cell["ss"]}\n{td_cell["sm"]}')
+        if wait_key_no_cursor() == "1" : print(f'{td_cell["ss"]}\n{td_cell["sm"]}')
         print()
         print()
 '''

@@ -1,4 +1,5 @@
-csv_file_path = "words\\mext\\2_grade.csv"
+csv_file_path = "words\\mext\\1_grade_1.csv"
+csv_file_path = ""
 #Caps Lock 주의!!!
 
 #1 : 네이버 일본어 사전에서 부수 검색
@@ -51,8 +52,11 @@ from tools.get_chrome_path import get_chrome_path
 import ast
 import unicodedata
 import time
+from tkinter.filedialog import askopenfilename
 
 
+if not csv_file_path : 
+    csv_file_path = askopenfilename(title="원본 파일 선택", filetypes=[("All Files", "*.*")])
 
 NEAR_INFO_FILE_PATH = ""
 try : 
@@ -372,7 +376,8 @@ class KanNearPrinter() :
 
                 data = json.loads(text)
                 self_data.near_kan_data = data
-            except :
+            except Exception as e :
+                print("e :",e)
                 print("disabled near service.")
                 return
 
@@ -778,7 +783,6 @@ class FlashcardApp(ctk.CTk):
     # 뜻 화면 업데이트
     def update_meaning_screen(self):
         data = self.remaining_data[self.current_index]
-        print('data :',data)
         self.p_label.configure(text=f"{data['p']}")#부수 및 획수: 
         self.s_label.configure(text=f"{data['s']}")#음독: 
         
@@ -799,6 +803,7 @@ class FlashcardApp(ctk.CTk):
             self.km_label.configure(anchor="w")#왼쪽 정렬
             self.km_label.configure(justify="left")#왼쪽 정렬
             
+            self.m_label.configure(text=f"")#훈독: 
             self.km_label.configure(text=f"{data_m}")#훈독과 한국어 뜻
 
 
