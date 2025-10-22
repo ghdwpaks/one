@@ -53,15 +53,40 @@ import ast
 import unicodedata
 import time
 from tkinter.filedialog import askopenfilename
-
+import shutil
 
 if not csv_file_path : 
     csv_file_path = askopenfilename(title="원본 파일 선택", filetypes=[("All Files", "*.*")])
 
 NEAR_INFO_FILE_PATH = ""
 try : 
-    NEAR_INFO_FILE_PATH = f"{csv_file_path.split('.')[0]}_near.txt"
+    if not NEAR_INFO_FILE_PATH : 
+        NEAR_INFO_FILE_PATH = askopenfilename(title="관련 정보 파일 선택", filetypes=[("All Files", "*.*")])
+
+    if not NEAR_INFO_FILE_PATH : 
+        user_input_folder = 'ops'
+        source_dir = os.path.dirname(csv_file_path)
+        file_name = os.path.basename(csv_file_path)
+        NEAR_INFO_FILE_PATH = os.path.join(source_dir, user_input_folder, file_name).replace("\\", "/")
+        
+        NEAR_INFO_FILE_PATH = f"{NEAR_INFO_FILE_PATH.split('.')[0]}_near.txt"
+
+
 except : pass
+
+print('NEAR_INFO_FILE_PATH :',NEAR_INFO_FILE_PATH)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 EMOJI_SETUP = {
@@ -365,6 +390,7 @@ class KanNearPrinter() :
     space = 1
     limit = 10
     def near_printer_main(self_data):
+        print("NEAR_INFO_FILE_PATH :",NEAR_INFO_FILE_PATH)
         if not self_data.near_kan_data : 
             if not NEAR_INFO_FILE_PATH : 
                 print("disabled near service.")
@@ -378,8 +404,16 @@ class KanNearPrinter() :
                 self_data.near_kan_data = data
             except Exception as e :
                 print("e :",e)
-                print("disabled near service.")
-                return
+                try:
+                    with open(NEAR_INFO_FILE_PATH, "r", encoding="utf-8") as f:
+                        text = f.read().strip()
+
+                    data = ast.literal_eval(text)  # ✅ 변경: Python dict 형태 문자열 처리 가능
+                    self_data.near_kan_data = data
+                except Exception as e:
+                    print("e:", e)
+                    print("disabled near service.")
+                    return
 
     
     
@@ -786,25 +820,50 @@ class FlashcardApp(ctk.CTk):
         self.p_label.configure(text=f"{data['p']}")#부수 및 획수: 
         self.s_label.configure(text=f"{data['s']}")#음독: 
         
-        if len(data['k']) < 2 and "·" in data['m'] : 
-            data_m = []
-            data_m_list = data['m'].split("·")
-            for kun in data_m_list :
-                if not self.near_kan_data : KanNearPrinter.near_printer_main(self_data=self)
-                data_m.append([kun,self.near_kan_data['kun'][data['k']][kun],self.near_kan_data['imi'][data['k']][kun]])
+        if len(data['k']) < 2 : 
+            
+            if not self.near_kan_data : KanNearPrinter.near_printer_main(self_data=self)
 
-            data_m = KanNearPrinter.setup_print(
-                data_m,
-                KanNearPrinter.space
-                )
-            
-            
-            
-            self.km_label.configure(anchor="w")#왼쪽 정렬
-            self.km_label.configure(justify="left")#왼쪽 정렬
-            
-            self.m_label.configure(text=f"")#훈독: 
-            self.km_label.configure(text=f"{data_m}")#훈독과 한국어 뜻
+            s, m, mu, mm, km = None, None, None, None, None
+
+            for near_cell in self.near_kan_data :
+                if near_cell['k'] == data['k'] :
+                    m = near_cell['m']
+                    s = near_cell['s']
+                    mu = near_cell['mu']
+                    mm = near_cell['mm']
+                    km = near_cell['km']
+
+                
+            self.s_label.configure(text=f"{s}")#음독: 
+
+            if km : 
+                #뜻이 하나만 있으면, 훈독도 하나라는 뜻이므로, 넘기기.
+                self.m_label.configure(text=f"{m}")#훈독: 
+                self.km_label.configure(text=f"{km}")#한국어 뜻: 
+                self.km_label.configure(anchor="center")#가운데 정렬
+            else : 
+
+                data_m = []
+                data_m_list = m.split("·")
+                for kun in data_m_list :
+
+
+
+                    data_m.append([kun,mu[kun],mm[kun]])
+
+                data_m = KanNearPrinter.setup_print(
+                    data_m,
+                    KanNearPrinter.space
+                    )
+                
+                
+                
+                self.km_label.configure(anchor="w")#왼쪽 정렬
+                self.km_label.configure(justify="left")#왼쪽 정렬
+                
+                self.m_label.configure(text=f"")#훈독: 
+                self.km_label.configure(text=f"{data_m}")#훈독과 한국어 뜻
 
 
 
