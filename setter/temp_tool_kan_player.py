@@ -12,51 +12,13 @@ import msvcrt
 import ctypes
 import sys
 
+from tools.code_tool_hide_cursor import nocur
+
 api_key = os.getenv("OPENAI_API_KEY")
 if not api_key:
     raise RuntimeError("OPENAI_API_KEY 환경변수가 없습니다.")
 
 client = openai.OpenAI(api_key=api_key)
-
-
-def hide_cursor():
-    """Windows 콘솔 커서 숨기기"""
-    class CONSOLE_CURSOR_INFO(ctypes.Structure):
-        _fields_ = [("dwSize", ctypes.c_int),
-                    ("bVisible", ctypes.c_bool)]
-
-    handle = ctypes.windll.kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
-    cursor_info = CONSOLE_CURSOR_INFO()
-    ctypes.windll.kernel32.GetConsoleCursorInfo(handle, ctypes.byref(cursor_info))
-    cursor_info.bVisible = False
-    ctypes.windll.kernel32.SetConsoleCursorInfo(handle, ctypes.byref(cursor_info))
-
-def show_cursor():
-    """Windows 콘솔 커서 복원"""
-    class CONSOLE_CURSOR_INFO(ctypes.Structure):
-        _fields_ = [("dwSize", ctypes.c_int),
-                    ("bVisible", ctypes.c_bool)]
-
-    handle = ctypes.windll.kernel32.GetStdHandle(-11)
-    cursor_info = CONSOLE_CURSOR_INFO()
-    ctypes.windll.kernel32.GetConsoleCursorInfo(handle, ctypes.byref(cursor_info))
-    cursor_info.bVisible = True
-    ctypes.windll.kernel32.SetConsoleCursorInfo(handle, ctypes.byref(cursor_info))
-
-def wait_key_no_cursor(prompt=""):
-    """CMD에서 커서 깜빡임 없이 엔터 대기"""
-    sys.stdout.write(prompt)
-    sys.stdout.flush()
-    hide_cursor()
-    try:
-        while True:
-            ch = msvcrt.getch()
-            if ch in (b'\r', b'\n'):  # Enter 입력 시 종료
-                break
-    finally:
-        show_cursor()
-        print("", end="", flush=True)
-
 
 def clean_up(s: str) -> str :
     try : 
@@ -152,11 +114,11 @@ def target_getter(target) :
 
     if isinstance(target,str) :
         speak_japanese(target)
-        wait_key_no_cursor()
+        nocur()
     elif isinstance(target,list) :
         for cell in target :
             speak_japanese(cell)
-            wait_key_no_cursor()
+            nocur()
 
 td = {
     "kun":{
@@ -237,7 +199,7 @@ for i in t :
                 if len(print_target_list) > 1 : 
                     print(f"{header}{k}")
                     speak_japanese(k)
-                    wait_key_no_cursor()
+                    nocur()
                     print(f"{td["imi"][i[0]][k]}")
                     print()
                     dont_need_imi = True
@@ -250,7 +212,7 @@ for i in t :
                     pass
                 else : 
                     print(f"{k}")
-            wait_key_no_cursor()
+            nocur()
     print("\n\n\n\n")
 
 '''
@@ -269,12 +231,12 @@ for i in t :
     if isinstance(target,str) :
         print(target)
         speak_japanese(target)
-        wait_key_no_cursor()
+        nocur()
     elif isinstance(target,list) :
         for cell in target :
             print(cell)
             speak_japanese(cell)
-            wait_key_no_cursor()
+            nocur()
 
     print("\n\n")
 
@@ -294,17 +256,17 @@ for i in range(len(t)) :
         print(td_cell["w"])
         print(td_cell["ws"])
         speak_japanese(td_cell["w"])
-        wait_key_no_cursor()
+        nocur()
         print(td_cell["m"])
-        wait_key_no_cursor()
+        nocur()
         print(td_cell["s"])
         print(td_cell["ss"])
         speak_japanese(td_cell["s"])
-        wait_key_no_cursor()
+        nocur()
         print(td_cell["sm"])
-        wait_key_no_cursor()
+        nocur()
 
-    wait_key_no_cursor()
+    nocur()
 
     target_getter(t[i][1])
     target_getter(t[i][2])
@@ -323,10 +285,10 @@ for i in range(len(t)) :
     td_l = td[target]["e"]
     for td_cell in td_l :
         print(td_cell["w"])
-        if wait_key_no_cursor() == "1" : print(f'{td_cell["ws"]}\n{td_cell["m"]}')
+        if nocur() == "1" : print(f'{td_cell["ws"]}\n{td_cell["m"]}')
         print()
         print(td_cell["s"])
-        if wait_key_no_cursor() == "1" : print(f'{td_cell["ss"]}\n{td_cell["sm"]}')
+        if nocur() == "1" : print(f'{td_cell["ss"]}\n{td_cell["sm"]}')
         print()
         print()
 '''

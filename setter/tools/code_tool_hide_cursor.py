@@ -34,19 +34,60 @@ def show_cursor():
     cursor_info.bVisible = True
     ctypes.windll.kernel32.SetConsoleCursorInfo(handle, ctypes.byref(cursor_info))
 
-def nocur(prompt=""):
-    """CMD에서 커서 깜빡임 없이 엔터 대기"""
+def nocur(prompt: str = "") -> str:
+    """
+    Windows 전용 한 줄 입력 함수.
+    - prompt 출력, 커서 숨김, 줄 편집 후 문자열 반환.
+    - Ctrl+C: KeyboardInterrupt 발생 (즉시).
+    - Ctrl+Z 후 Enter: EOFError (input() 호환).
+    - 화살표/홈/엔드는 무시(간단 모드).
+    """
     sys.stdout.write(prompt)
     sys.stdout.flush()
     hide_cursor()
+    buf: list[str] = []
     try:
         while True:
-            ch = msvcrt.getch()
-            if ch in (b'\r', b'\n'):  # Enter 입력 시 종료
-                break
+            ch = msvcrt.getwch()  # 유니코드 키 1글자
+
+            # Ctrl+C → KeyboardInterrupt (의도적으로 즉시 중단)
+            if ch == '\x03':
+                raise KeyboardInterrupt
+
+            # Ctrl+Z → EOF (Windows input() 동작과 일치)
+            if ch == '\x1a':
+                sys.stdout.write('\n')
+                sys.stdout.flush()
+                raise EOFError
+
+            # Enter → 입력 확정
+            if ch in ('\r', '\n'):
+                sys.stdout.write('\n')
+                sys.stdout.flush()
+                return ''.join(buf)
+
+            # Backspace → 한 글자 삭제
+            if ch in ('\b', '\x7f'):
+                if buf:
+                    buf.pop()
+                    # 콘솔에서 시각적으로 1칸 지우기
+                    sys.stdout.write('\b \b')
+                    sys.stdout.flush()
+                continue
+
+            # 특수키(화살표/기능키) 프리픽스 → 다음 코드 소비 후 무시
+            if ch in ('\x00', '\xe0'):
+                _ = msvcrt.getwch()
+                continue
+
+            # 일반 문자 입력
+            buf.append(ch)
+            sys.stdout.write(ch)
+            sys.stdout.flush()
     finally:
+        # 예외/종료 모두에서 커서 복구 보장
         show_cursor()
-        print("", end="", flush=True)
+
 
 
 def clean_up(s: str) -> str :

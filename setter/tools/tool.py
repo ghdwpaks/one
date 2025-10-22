@@ -11,6 +11,10 @@ import os
 import sys
 import shutil
 import platform
+import time
+import webbrowser
+import re
+
 
 # CSV 파일 읽기
 def read_and_process_csv(file_path):
@@ -65,7 +69,71 @@ def open_csv(self=None,called_from_one=None):
     self.show_editor()
 
 
+def clean_up(s: str) -> str:
+    try:
+        '''
+        "["와 "]" 대괄호를 제거.
+        한글/영문/언더바 뒤에 붙은 마침표 "."를 찾아서 제거.
 
+        
+        앞뒤 공백을 제거.
+        정규식을 이용해 양 끝을 감싸고 있는 가장 바깥 괄호([, {, ()를 반복적으로 제거.
+        중첩된 바깥 괄호도 모두 제거.
+        끝에 붙은 마침표(.)나 쉼표(,)를 반복적으로 제거하고, 제거 후 남은 공백도 다시 정리.
+        마지막으로 정리된 문자열을 반환.
+
+        영문, 숫자, 언더바, 공백, 한글, 히라가나, 가타카나, 한자만 남기고 나머지 특수문자를 제거.
+        처리 과정에서 예외가 발생하면 오류 메시지를 출력하고 None을 반환.
+        '''
+        s = s.strip()
+        s = s.replace("[", "").replace("]", "")
+        pattern = r"([가-힣a-zA-Z_])\."
+        s = re.sub(pattern, r"\1", s)
+        s = s.strip()
+
+
+        s = s.strip()
+        # 양 끝의 공백 포함, 가장 바깥 괄호들 반복 제거
+        while re.match(r'^\s*[\[\{\(](.*)[\]\}\)]\s*$', s):
+            s = re.sub(r'^\s*[\[\{\(](.*)[\]\}\)]\s*$', r'\1', s)
+            s = s.strip(" \t\n\r")  # 중간에도 반복 제거
+        s = s.strip()
+
+
+        # 끝에 붙은 온점, 쉼표 제거
+        while s and s[-1] in '.,':
+            s = s[:-1].rstrip()
+
+        return re.sub(
+            r"[^\w\s\uAC00-\uD7A3\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]", "", s
+        )
+    except Exception as e:
+        print("clean_up e :", e)
+        return None
+    
+
+api_key = os.getenv("OPENAI_API_KEY")
+# --- exam_roller.py : ask_gpt()만 교체 ---------------------------------
+def ask_gpt(question: str,model_name="gpt-4o-mini") -> str:
+    try:
+        messages = [
+            {"role": "system", "content": ""},
+            {"role": "user", "content": question}
+        ]
+        import openai
+        response = openai.OpenAI(api_key=api_key).chat.completions.create(
+            model=model_name,
+            messages=messages,
+        )
+        return clean_up(response.choices[0].message.content)
+    except Exception as e:
+        print("ask_gpt e :", e)
+        return None
+    
+def naver_dictionary_open(self=None, target="") :
+    url = f"https://ja.dict.naver.com/#/search?query={target}"
+    webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(get_chrome_path()))
+    webbrowser.get('chrome').open(url)
 
 def get_chrome_path():
     system = platform.system()

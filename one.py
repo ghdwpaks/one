@@ -47,7 +47,7 @@ import os
 import subprocess
 import json
 import random
-from tools.get_chrome_path import get_chrome_path
+from setter.tools.get_chrome_path import get_chrome_path
 
 import ast
 import unicodedata
