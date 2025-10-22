@@ -1,0 +1,80 @@
+import os
+import tempfile
+from gtts import gTTS
+from playsound import playsound
+import re
+
+import msvcrt
+
+import ctypes
+import sys
+
+
+def hide_cursor():
+    """Windows 콘솔 커서 숨기기"""
+    class CONSOLE_CURSOR_INFO(ctypes.Structure):
+        _fields_ = [("dwSize", ctypes.c_int),
+                    ("bVisible", ctypes.c_bool)]
+
+    handle = ctypes.windll.kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
+    cursor_info = CONSOLE_CURSOR_INFO()
+    ctypes.windll.kernel32.GetConsoleCursorInfo(handle, ctypes.byref(cursor_info))
+    cursor_info.bVisible = False
+    ctypes.windll.kernel32.SetConsoleCursorInfo(handle, ctypes.byref(cursor_info))
+
+def show_cursor():
+    """Windows 콘솔 커서 복원"""
+    class CONSOLE_CURSOR_INFO(ctypes.Structure):
+        _fields_ = [("dwSize", ctypes.c_int),
+                    ("bVisible", ctypes.c_bool)]
+
+    handle = ctypes.windll.kernel32.GetStdHandle(-11)
+    cursor_info = CONSOLE_CURSOR_INFO()
+    ctypes.windll.kernel32.GetConsoleCursorInfo(handle, ctypes.byref(cursor_info))
+    cursor_info.bVisible = True
+    ctypes.windll.kernel32.SetConsoleCursorInfo(handle, ctypes.byref(cursor_info))
+
+def wait_key_no_cursor(prompt=""):
+    """CMD에서 커서 깜빡임 없이 엔터 대기"""
+    sys.stdout.write(prompt)
+    sys.stdout.flush()
+    hide_cursor()
+    try:
+        while True:
+            ch = msvcrt.getch()
+            if ch in (b'\r', b'\n'):  # Enter 입력 시 종료
+                break
+    finally:
+        show_cursor()
+        print("", end="", flush=True)
+
+
+def clean_up(s: str) -> str :
+    try : 
+        text = s.replace('[', '').replace(']', '')
+        
+        pattern = r'([가-힣a-zA-Z_])\.'
+        replaced = re.sub(pattern, r'\1', text)
+        print("replaced :",replaced)
+        return replaced
+    except Exception as e:
+        print("return_sentence_prompt e :",e)
+        return None
+
+def speak_japanese(text: str, slow: bool = False):
+    if not text.strip():
+        print("[speak_japanese]:입력된 문장이 없습니다.")
+        return 
+    # 임시 mp3 파일 생성
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+        tts = gTTS(text=text, lang="ja", slow=slow)
+        tts.save(fp.name)
+        temp_path = fp.name
+
+    try:
+        playsound(temp_path)
+    finally:
+        try:
+            os.remove(temp_path)
+        except PermissionError:
+            pass  # 재생 중이면 OS가 나중에 정리

@@ -17,7 +17,6 @@ print("#"*888)
 
 
 f = open('1t_res_file.txt', 'w', encoding="utf-8")
-
 print(td, file=f)
 
 
