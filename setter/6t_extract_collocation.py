@@ -1,13 +1,48 @@
-KAN_LIST = list("一右雨円王音下火花貝学気九休玉金空月犬見五口校左三山子四糸字耳七車手十出女小上森人水正生青夕石赤千川先早草足村大男竹中虫町天田土二日入年白八百文木本名目立力林六")
 
 #pip install regex
 import ast, json, os
 import regex as re
 from collections import OrderedDict
+from tkinter.filedialog import askopenfilename
 
 SRC_TXT = r"C:\\t\\one\\words\\mext\\ops\\2_grade_sentences.txt"  # 미사용이면 지워도 됨
 SRC_JSON = "temps/todaii_sentences.json"
 OUT_DIR  = "./temps"
+OUT_DIR  = "."
+
+
+while True :
+    csv_file_path = askopenfilename(title="원본 파일 선택", filetypes=[("All Files", "*.*")])
+    NEAR_INFO_FILE_PATH = f"{csv_file_path.split('.')[0]}_collocation.txt"
+
+
+    
+    user_input_folder = 'ops'
+    source_dir = os.path.dirname(csv_file_path)
+    file_name = os.path.basename(csv_file_path)
+    
+    NEAR_INFO_FILE_PATH = os.path.join(source_dir, user_input_folder, file_name).replace("\\", "/")
+    NEAR_INFO_FILE_PATH = f"{NEAR_INFO_FILE_PATH.split('.')[0]}_collocation.txt"
+    
+
+
+    print("NEAR_INFO_FILE_PATH : ",NEAR_INFO_FILE_PATH)
+    a = input("OK?")
+    if a : 
+        continue
+    else : 
+        break
+
+
+
+with open(csv_file_path, "r", encoding="utf-8") as f:
+    text = f.read()
+kanji_pattern = re.compile(r"[\u3400-\u4DBF\u4E00-\u9FFF]")
+kanji_string = kanji_pattern.findall(text)
+kanji_string = "".join(list(set(kanji_string)))
+
+print("kanji_string :",kanji_string)
+KAN_LIST = kanji_string
 
 
 
@@ -82,10 +117,6 @@ for kan in KAN_LIST:
     pat_single = re.compile(fr'(?<!\p{{Script=Han}}){kan}(?!\p{{Script=Han}})')
     r = [s for s in data if pat_single.search(s)]
 
-    # 파일로 기록(원하면 생략 가능)
-    with open(f"{OUT_DIR}/6t{kan}_r_file.txt", "w", encoding="utf-8") as f:
-        print(kan, file=f)
-        print(r, file=f)
 
     # 콜로케 추출
     out = []
@@ -93,8 +124,15 @@ for kan in KAN_LIST:
         out += extract_for_T(s, kan)
     final_result[kan] = uniq(out)
 
+'''
 # 확인
 print("result :", final_result)
 print("*"*88)
 for k, v in final_result.items():
     print(k, v)
+'''
+
+
+# 파일로 기록(원하면 생략 가능)
+with open(NEAR_INFO_FILE_PATH, "w", encoding="utf-8") as f:
+    print(final_result, file=f)
