@@ -71,9 +71,66 @@ try :
         
         NEAR_INFO_FILE_PATH = f"{NEAR_INFO_FILE_PATH.split('.')[0]}_near.txt"
 
-except : pass
+    
+    text = ""
+    with open(NEAR_INFO_FILE_PATH, "r", encoding="utf-8") as f:
+        text = f.read().strip()
+    data = ast.literal_eval(text)
+            
+except : 
+    NEAR_INFO_FILE_PATH = ""
+
+    try : 
+        
+        user_input_folder = 'ops'
+        source_dir = os.path.dirname(csv_file_path)
+        file_name = os.path.basename(csv_file_path)
+
+        #'2_grade_2'
+        splited_file_name = file_name.split("_")
+        #print('splited_file_name :',splited_file_name)
+        #['2', 'grade', '1.csv']
+
+
+        front_file_name = splited_file_name[:-1]
+        #print('front_file_name :',front_file_name)
+        #['2', 'grade']
+
+        file_type = splited_file_name[-1].split(".")[-1]
+        #print('file_type :',file_type)
+        # '.csv'
+
+        file_name = f"{'_'.join(front_file_name)}"
+        #print('file_name :',file_name)
+        #'2_grade'
+
+        file_name = file_name + "." + file_type
+        #print('file_name :',file_name)
+        #'2_grade.csv'
+
+        NEAR_INFO_FILE_PATH = os.path.join(source_dir, user_input_folder, file_name)
+        NEAR_INFO_FILE_PATH = NEAR_INFO_FILE_PATH.replace("\\", "/")
+        
+        
+        NEAR_INFO_FILE_PATH = f"{NEAR_INFO_FILE_PATH.split('.')[0]}_near.txt"
+
+        text = ""
+        with open(NEAR_INFO_FILE_PATH, "r", encoding="utf-8") as f:
+            text = f.read().strip()
+        data = ast.literal_eval(text)
+
+        
+    except Exception as e : 
+        print("NEAR_INFO_FILE_PATH e :",e)
+        NEAR_INFO_FILE_PATH = ""
+        pass
 
 print('NEAR_INFO_FILE_PATH :',NEAR_INFO_FILE_PATH)
+
+
+
+
+
 
 
 
