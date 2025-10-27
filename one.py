@@ -71,15 +71,9 @@ try :
         
         NEAR_INFO_FILE_PATH = f"{NEAR_INFO_FILE_PATH.split('.')[0]}_near.txt"
 
-
 except : pass
 
 print('NEAR_INFO_FILE_PATH :',NEAR_INFO_FILE_PATH)
-
-
-
-
-
 
 
 
@@ -417,7 +411,7 @@ class KanNearPrinter() :
 
     
     
-    def setup_print(r: list[dict], sp: int):
+    def setup_print(r: list[dict], sp: int, just_parts: bool = False):
         if not r:
             return ""
         mk = max(WordNearPrinter.w(x[0]) for x in r)
@@ -429,7 +423,10 @@ class KanNearPrinter() :
             #spd = "\t" * (ms - WordNearPrinter.w(x[1]) + sp)
             kp = "\t"
             spd = "\t"
-            out = f"{out}{x[0]}{kp}{x[1]}{spd}{x[2]}"
+            if just_parts == True:
+                out = f"{out}{x[1]}"
+            else : 
+                out = f"{out}{x[0]}{kp}{x[1]}{spd}{x[2]}"
 
             out = f"{out}\n"
         
@@ -479,10 +476,6 @@ class FlashcardApp(ctk.CTk):
         self.progress_bar.pack(pady=10)
         self.progress_bar.set(0)  # 초기 진행률: 0%
 
-        shortcuts = self.load_shortcuts_from_json('tools/setting.json')
-        self.bind_shortcuts_from_setting(shortcuts)
-
-
         # 초기 화면 구성
         self.show_initial_screen()
 
@@ -492,6 +485,7 @@ class FlashcardApp(ctk.CTk):
         self.stamped_already = False
 
         self.near_kan_data = None
+        self.is_printing_all_meaning_info = False
 
 
     
@@ -504,6 +498,7 @@ class FlashcardApp(ctk.CTk):
         self.bind("<Right>", self.known_action)  # 오른쪽 방향키로 '알겠어요'
 
         self.bind("w", self.toggle_screen);self.bind("W", self.toggle_screen) # 화살표 위쪽 키로 화면 전환
+        self.bind("<Control-w>", self.toggle_meaning_screen);self.bind("<Control-W>", self.toggle_meaning_screen)
         
 
         self.bind("a", self.unknown_action);self.bind("A", self.unknown_action) # 'a' 키 입력으로 '모르겠어요'
@@ -814,6 +809,73 @@ class FlashcardApp(ctk.CTk):
         else:
             self.show_meaning_screen()
 
+    def get_kanji_info(self, kanji) :
+        if not self.near_kan_data : KanNearPrinter.near_printer_main(self_data=self)
+
+        s, m, mu, mm, km = None, None, None, None, None
+
+        for near_cell in self.near_kan_data :
+            if near_cell['k'] == kanji :
+                m = near_cell['m']
+                s = near_cell['s']
+                mu = near_cell['mu']
+                mm = near_cell['mm']
+                km = near_cell['km']
+
+        res = {}
+        res["m"] = m
+        res["s"] = s
+        res["mu"] = mu
+        res["mm"] = mm
+        res["km"] = km
+
+        return res
+
+    def set_kanji_info(self,kanji_info,print_just_parts) :
+        
+        m = kanji_info['m']
+        mu = kanji_info['mu']
+        mm = kanji_info['mm']
+        
+        data_m = []
+        data_m_list = m.split("·")
+        for kun in data_m_list :
+            data_m.append([kun,mu[kun],mm[kun]])
+
+        data_m = KanNearPrinter.setup_print(
+            data_m,
+            KanNearPrinter.space,
+            print_just_parts
+            )
+        
+        self.km_label.configure(anchor="w")#왼쪽 정렬
+        self.km_label.configure(justify="left")#왼쪽 정렬
+        
+        self.m_label.configure(text=f"")#훈독: 
+        self.km_label.configure(text=f"{data_m}")#훈독과 한국어 뜻
+
+
+
+
+    # 의미 화면 전환
+    def toggle_meaning_screen(self, event=None):
+        if self.is_printing_all_meaning_info:
+            print_just_parts = True
+        else : 
+            print_just_parts = False
+            
+        data = self.remaining_data[self.current_index]
+        kanji_info = self.get_kanji_info(data['k'])
+        
+        if kanji_info['km'] : 
+            pass
+        else : 
+            self.set_kanji_info(kanji_info,print_just_parts)
+
+        self.is_printing_all_meaning_info = not print_just_parts
+
+
+
     # 뜻 화면 업데이트
     def update_meaning_screen(self):
         data = self.remaining_data[self.current_index]
@@ -821,58 +883,28 @@ class FlashcardApp(ctk.CTk):
         self.s_label.configure(text=f"{data['s']}")#음독: 
         
         if len(data['k']) < 2 : 
+            kanji_info = self.get_kanji_info(data['k'])
             
-            if not self.near_kan_data : KanNearPrinter.near_printer_main(self_data=self)
-
-            s, m, mu, mm, km = None, None, None, None, None
-
-            for near_cell in self.near_kan_data :
-                if near_cell['k'] == data['k'] :
-                    m = near_cell['m']
-                    s = near_cell['s']
-                    mu = near_cell['mu']
-                    mm = near_cell['mm']
-                    km = near_cell['km']
-
-                
-            self.s_label.configure(text=f"{s}")#음독: 
+            km = kanji_info['km']
+            self.s_label.configure(text=f"{kanji_info['s']}")#음독: 
 
             if km : 
                 #뜻이 하나만 있으면, 훈독도 하나라는 뜻이므로, 넘기기.
-                self.m_label.configure(text=f"{m}")#훈독: 
+                self.m_label.configure(text=f"{kanji_info['m']}")#훈독: 
                 self.km_label.configure(text=f"{km}")#한국어 뜻: 
                 self.km_label.configure(anchor="center")#가운데 정렬
             else : 
-
-                data_m = []
-                data_m_list = m.split("·")
-                for kun in data_m_list :
-
-
-
-                    data_m.append([kun,mu[kun],mm[kun]])
-
-                data_m = KanNearPrinter.setup_print(
-                    data_m,
-                    KanNearPrinter.space
-                    )
+                print_just_parts = True
+                self.set_kanji_info(kanji_info,print_just_parts)
                 
-                
-                
-                self.km_label.configure(anchor="w")#왼쪽 정렬
-                self.km_label.configure(justify="left")#왼쪽 정렬
-                
-                self.m_label.configure(text=f"")#훈독: 
-                self.km_label.configure(text=f"{data_m}")#훈독과 한국어 뜻
-
-
+                self.is_printing_all_meaning_info = not print_just_parts
 
         else : 
             self.m_label.configure(text=f"{data['m']}")#훈독: 
             self.km_label.configure(text=f"{data['km']}")#한국어 뜻: 
             self.km_label.configure(anchor="center")#가운데 정렬
 
-    # 단어 화면 업데이트    
+    # 단어 화면 업데이트
     def update_word_screen(self):
         data = self.remaining_data[self.current_index]
         self.word_label.configure(text=data['k'])
