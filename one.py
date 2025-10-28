@@ -130,16 +130,6 @@ print('NEAR_INFO_FILE_PATH :',NEAR_INFO_FILE_PATH)
 
 
 
-
-
-
-
-
-
-
-
-
-
 EMOJI_SETUP = {
     "is_jlpt_common" : {
         1:"🔵",#별로 안중요한거
@@ -481,7 +471,7 @@ class KanNearPrinter() :
             kp = "\t"
             spd = "\t"
             if just_parts == True:
-                out = f"{out}{x[1]}"
+                out = f"{out}{kp}{x[1]}{spd}"
             else : 
                 out = f"{out}{x[0]}{kp}{x[1]}{spd}{x[2]}"
 
