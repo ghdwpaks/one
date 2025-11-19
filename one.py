@@ -83,7 +83,11 @@ except :
     try : 
         
         user_input_folder = 'ops'
-        source_dir = os.path.dirname(csv_file_path)
+
+        source_dir = os.path.dirname(csv_file_path) #C:/t/one/words/mext/2
+        
+        source_dir = source_dir[:-2] #C:/t/one/words/mext
+
         file_name = os.path.basename(csv_file_path)
 
         #'2_grade_2'
