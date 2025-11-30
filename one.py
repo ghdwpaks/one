@@ -1114,7 +1114,7 @@ class FlashcardApp(ctk.CTk):
             else : 
                 if target == 11 : 
                     target = self.word_label.cget("text")
-                    pyperclip.copy(f"= {target}")
+                    pyperclip.copy(f" = {target}")
                 elif target == 12 : 
                     target = self.word_label.cget("text")
                     pyperclip.copy(f"{target}")
